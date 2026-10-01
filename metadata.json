@@ -1,0 +1,6 @@
+{
+  "name": "KasirKu POS - Kasir Online Grosir & Ecer",
+  "description": "Aplikasi kasir online simpel dan praktis dengan penjualan eceran dan grosir, pembayaran tunai & non-tunai, cetak struk otomatis, pencatatan barang masuk & keluar, serta hak akses PIN Kasir, Pengelola, dan Admin.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
