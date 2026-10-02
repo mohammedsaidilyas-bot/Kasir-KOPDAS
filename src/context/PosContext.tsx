@@ -174,13 +174,11 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
   // Sync to Storage
+  const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
+
   useEffect(() => {
     sessionStorage.setItem('kasirku_authenticated', isAuthenticated ? 'true' : 'false');
   }, [isAuthenticated]);
-
-  useEffect(() => {
-    localStorage.setItem('kasirku_cashiers', JSON.stringify(cashiers));
-  }, [cashiers]);
 
   useEffect(() => {
     if (currentCashier) {
@@ -192,21 +190,92 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('kasirku_role', currentRole);
   }, [currentRole]);
 
+  // 1. Initial Load from Server
   useEffect(() => {
+    fetch('/api/data')
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData.success && resData.data) {
+          const d = resData.data;
+          if (d.settings) setSettings(d.settings);
+          if (d.products) setProducts(d.products);
+          if (d.stockMovements) setStockMovements(d.stockMovements);
+          if (d.transactions) setTransactions(d.transactions);
+          if (d.cashiers) setCashiers(d.cashiers);
+        }
+        setHasLoadedFromServer(true);
+      })
+      .catch((err) => {
+        console.error("Failed to load from server, using localStorage:", err);
+        setHasLoadedFromServer(true);
+      });
+  }, []);
+
+  // 2. Continuous Polling from Server to stay in sync with other devices/APK
+  useEffect(() => {
+    if (!hasLoadedFromServer) return;
+    const interval = setInterval(() => {
+      fetch('/api/data')
+        .then((res) => res.json())
+        .then((resData) => {
+          if (resData.success && resData.data) {
+            const d = resData.data;
+            if (d.settings && JSON.stringify(d.settings) !== JSON.stringify(settings)) {
+              setSettings(d.settings);
+            }
+            if (d.products && JSON.stringify(d.products) !== JSON.stringify(products)) {
+              setProducts(d.products);
+            }
+            if (d.stockMovements && JSON.stringify(d.stockMovements) !== JSON.stringify(stockMovements)) {
+              setStockMovements(d.stockMovements);
+            }
+            if (d.transactions && JSON.stringify(d.transactions) !== JSON.stringify(transactions)) {
+              setTransactions(d.transactions);
+            }
+            if (d.cashiers && JSON.stringify(d.cashiers) !== JSON.stringify(cashiers)) {
+              setCashiers(d.cashiers);
+            }
+          }
+        })
+        .catch((err) => console.error("Polling error:", err));
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
+
+  // 3. Save to server whenever state changes
+  useEffect(() => {
+    if (!hasLoadedFromServer) return;
+
+    // Save to localStorage as local backup
     localStorage.setItem('kasirku_settings', JSON.stringify(settings));
-  }, [settings]);
-
-  useEffect(() => {
     localStorage.setItem('kasirku_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
     localStorage.setItem('kasirku_movements', JSON.stringify(stockMovements));
-  }, [stockMovements]);
-
-  useEffect(() => {
     localStorage.setItem('kasirku_transactions', JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem('kasirku_cashiers', JSON.stringify(cashiers));
+
+    // Post to Express backend
+    fetch('/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          settings,
+          products,
+          stockMovements,
+          transactions,
+          cashiers,
+        },
+      }),
+    })
+      .then((res) => res.json())
+      .then((resData) => {
+        if (!resData.success) {
+          console.error("Server save returned success=false");
+        }
+      })
+      .catch((err) => console.error("Failed to save to server:", err));
+  }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
 
   // Cashier management
   const addCashier = (name: string, pin: string): CashierUser => {
