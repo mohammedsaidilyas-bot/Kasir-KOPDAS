@@ -420,12 +420,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Role permissions:
   // - kasir: 'pos', 'history'
-  // - pengelola: 'pos', 'history', 'inventory', 'products'
+  // - pengelola: 'pos', 'history', 'inventory', 'products', 'reports'
   // - admin: all tabs
   const canAccessTab = (tab: string): boolean => {
     if (currentRole === 'admin') return true;
     if (currentRole === 'pengelola') {
-      return ['pos', 'history', 'inventory', 'products'].includes(tab);
+      return ['pos', 'history', 'inventory', 'products', 'reports'].includes(tab);
     }
     // kasir:
     return ['pos', 'history'].includes(tab);
@@ -434,7 +434,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setActiveTab = (tab: 'pos' | 'history' | 'inventory' | 'products' | 'reports' | 'settings') => {
     if (!canAccessTab(tab)) {
       // Require PIN of required role
-      const requiredRole: UserRole = ['reports', 'settings'].includes(tab) ? 'admin' : 'pengelola';
+      const requiredRole: UserRole = tab === 'settings' ? 'admin' : 'pengelola';
       openPinModal(requiredRole, () => {
         setActiveTabInternal(tab);
       });

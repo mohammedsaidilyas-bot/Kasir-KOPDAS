@@ -222,3 +222,87 @@ export function generateClosingReportText(
   return msg;
 }
 
+export function generateMonthlyReportText(
+  transactions: SaleTransaction[],
+  store: StoreSettings,
+  operatorName: string,
+  monthName: string,
+  year: number
+): string {
+  const totalOmzet = transactions.reduce((sum, t) => sum + t.grandTotal, 0);
+
+  let totalHpp = 0;
+  transactions.forEach((trx) => {
+    trx.items.forEach((item) => {
+      totalHpp += item.product.costPrice * item.qty;
+    });
+  });
+
+  const grossProfit = totalOmzet - totalHpp;
+  const totalCash = transactions
+    .filter((t) => t.paymentMethod === 'tunai')
+    .reduce((sum, t) => sum + t.grandTotal, 0);
+  const totalNonCash = transactions
+    .filter((t) => t.paymentMethod !== 'tunai')
+    .reduce((sum, t) => sum + t.grandTotal, 0);
+
+  const totalGrosir = transactions
+    .filter((t) => t.customerType === 'grosir')
+    .reduce((sum, t) => sum + t.grandTotal, 0);
+  const totalEcer = transactions
+    .filter((t) => t.customerType === 'ecer')
+    .reduce((sum, t) => sum + t.grandTotal, 0);
+
+  const totalItemsSold = transactions.reduce((sum, t) => sum + t.totalQty, 0);
+
+  // Top products
+  const productMap: Record<string, { name: string; qty: number }> = {};
+  transactions.forEach((t) => {
+    t.items.forEach((item) => {
+      if (!productMap[item.product.id]) {
+        productMap[item.product.id] = { name: item.product.name, qty: 0 };
+      }
+      productMap[item.product.id].qty += item.qty;
+    });
+  });
+  const topProducts = Object.values(productMap)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 5); // top 5 for monthly report!
+
+  let msg = `📊 *REKAP BULANAN TOKO - KASIRKU POS*\n`;
+  msg += `🏬 *${store.storeName.toUpperCase()}*\n`;
+  msg += `📅 *Periode:* ${monthName} ${year}\n`;
+  msg += `👤 *Disusun Oleh:* ${operatorName}\n`;
+  msg += `----------------------------------------\n\n`;
+
+  msg += `💰 *RINGKASAN KEUANGAN BULANAN*\n`;
+  msg += `• *Total Omzet Penjualan:* ${formatRupiah(totalOmzet)}\n`;
+  msg += `• *Total Modal Produk (HPP):* ${formatRupiah(totalHpp)}\n`;
+  msg += `• *ESTIMASI LABA KOTOR:* ${formatRupiah(grossProfit)} 🌟\n`;
+  msg += `• *Margin Keuntungan:* ${totalOmzet > 0 ? ((grossProfit / totalOmzet) * 100).toFixed(1) : 0}%\n\n`;
+
+  msg += `💳 *METODE PENERIMAAN DANA*\n`;
+  msg += `• *Total Pembayaran Tunai:* ${formatRupiah(totalCash)}\n`;
+  msg += `• *Total QRIS/Transfer/EDC:* ${formatRupiah(totalNonCash)}\n\n`;
+
+  msg += `📦 *RINCIAN PENJUALAN*\n`;
+  msg += `• Total Transaksi Selesai: ${transactions.length} Transaksi\n`;
+  msg += `• Rata-rata Nilai Belanja: ${formatRupiah(totalOmzet / (transactions.length || 1))}\n`;
+  msg += `• Penjualan Grosir: ${formatRupiah(totalGrosir)}\n`;
+  msg += `• Penjualan Eceran: ${formatRupiah(totalEcer)}\n`;
+  msg += `• Total Barang Terjual: ${totalItemsSold} item\n\n`;
+
+  if (topProducts.length > 0) {
+    msg += `⭐ *5 PRODUK PALING LARIS BULAN INI:*\n`;
+    topProducts.forEach((p, idx) => {
+      msg += `  ${idx + 1}. ${p.name} (${p.qty} unit)\n`;
+    });
+    msg += `\n`;
+  }
+
+  msg += `----------------------------------------\n`;
+  msg += `✅ _Laporan rekap bulanan otomatis KasirKu POS._`;
+
+  return msg;
+}
+

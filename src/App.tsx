@@ -16,7 +16,7 @@ const MainContent: React.FC = () => {
   const { activeTab, canAccessTab, loginAsRole, openPinModal, settings } = usePos();
 
   if (!canAccessTab(activeTab)) {
-    const required = ['reports', 'settings'].includes(activeTab) ? 'admin' : 'pengelola';
+    const required = activeTab === 'settings' ? 'admin' : 'pengelola';
     const requiredPin = required === 'admin' ? settings.pinAdmin : settings.pinPengelola;
 
     return (

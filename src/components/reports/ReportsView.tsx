@@ -11,19 +11,50 @@ import {
   Send,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
-import { formatRupiah, formatNumber } from '../../utils/formatters';
+import {
+  formatRupiah,
+  formatNumber,
+  generateMonthlyReportText,
+  formatWhatsAppUrl,
+} from '../../utils/formatters';
 import { ClosingStoreModal } from '../pos/ClosingStoreModal';
 
 export const ReportsView: React.FC = () => {
-  const { transactions, products } = usePos();
+  const { transactions, products, settings, currentUserName } = usePos();
   const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
 
-  // Metrics computation
-  const totalRevenue = transactions.reduce((acc, t) => acc + t.grandTotal, 0);
+  // Filter States
+  const [filterType, setFilterType] = useState<'all' | 'daily' | 'monthly'>('all');
+  const [selectedDay, setSelectedDay] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const MONTHS_ID = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  // Filtering Logic over transactions
+  const filteredTransactions = transactions.filter((t) => {
+    if (filterType === 'daily') {
+      return t.timestamp.slice(0, 10) === selectedDay;
+    }
+    if (filterType === 'monthly') {
+      const tDate = new Date(t.timestamp);
+      return (
+        tDate.getMonth() === selectedMonth &&
+        tDate.getFullYear() === selectedYear
+      );
+    }
+    return true; // 'all'
+  });
+
+  // Metrics computation based on filtered transactions
+  const totalRevenue = filteredTransactions.reduce((acc, t) => acc + t.grandTotal, 0);
 
   // Compute Cost of Goods Sold (COGS / HPP) & Net Profit
   let totalHpp = 0;
-  transactions.forEach((trx) => {
+  filteredTransactions.forEach((trx) => {
     trx.items.forEach((item) => {
       totalHpp += item.product.costPrice * item.qty;
     });
@@ -31,13 +62,13 @@ export const ReportsView: React.FC = () => {
 
   const grossProfit = totalRevenue - totalHpp;
   const profitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
-  const totalItemsSold = transactions.reduce((acc, t) => acc + t.totalQty, 0);
+  const totalItemsSold = filteredTransactions.reduce((acc, t) => acc + t.totalQty, 0);
 
   // Grosir vs Eceran breakdown
-  const grosirRevenue = transactions
+  const grosirRevenue = filteredTransactions
     .filter((t) => t.customerType === 'grosir')
     .reduce((acc, t) => acc + t.grandTotal, 0);
-  const ecerRevenue = transactions
+  const ecerRevenue = filteredTransactions
     .filter((t) => t.customerType === 'ecer')
     .reduce((acc, t) => acc + t.grandTotal, 0);
 
@@ -47,7 +78,7 @@ export const ReportsView: React.FC = () => {
     { name: string; category: string; qty: number; totalSales: number; profit: number }
   > = {};
 
-  transactions.forEach((trx) => {
+  filteredTransactions.forEach((trx) => {
     trx.items.forEach((item) => {
       const pid = item.product.id;
       if (!productSalesMap[pid]) {
@@ -70,7 +101,7 @@ export const ReportsView: React.FC = () => {
   // Export CSV
   const handleExportCSV = () => {
     const headers = ['No Struk', 'Waktu', 'Kasir', 'Tipe Penjualan', 'Metode Bayar', 'Total Tagihan'];
-    const rows = transactions.map((t) => [
+    const rows = filteredTransactions.map((t) => [
       t.id,
       t.timestamp,
       t.cashierName,
@@ -86,10 +117,28 @@ export const ReportsView: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `laporan_penjualan_${new Date().toISOString().slice(0, 10)}.csv`);
+    const filename = filterType === 'daily'
+      ? `laporan_penjualan_harian_${selectedDay}.csv`
+      : filterType === 'monthly'
+      ? `laporan_penjualan_bulanan_${MONTHS_ID[selectedMonth]}_${selectedYear}.csv`
+      : `laporan_penjualan_semua_waktu.csv`;
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // WhatsApp Monthly Report trigger
+  const handleSendMonthlyReportWA = () => {
+    const reportText = generateMonthlyReportText(
+      filteredTransactions,
+      settings,
+      currentUserName,
+      MONTHS_ID[selectedMonth],
+      selectedYear
+    );
+    const waUrl = formatWhatsAppUrl(settings.adminWaPhone || '085704800313', reportText);
+    window.open(waUrl, '_blank');
   };
 
   return (
@@ -104,14 +153,14 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           <button
             type="button"
             onClick={() => setIsClosingModalOpen(true)}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Kirim Rekap Tutup Toko ke WA</span>
+            <span>Kirim Rekap Tutup Toko (Harian) ke WA</span>
           </button>
 
           <button
@@ -125,6 +174,108 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Periode Laporan Toolbar */}
+      <div className="bg-white border border-neutral-200 rounded-2xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-neutral-700 uppercase tracking-wider block mr-2">
+            Periode Laporan:
+          </span>
+          <div className="inline-flex rounded-xl p-1 bg-neutral-100 border border-neutral-200">
+            <button
+              type="button"
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                filterType === 'all'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-950'
+              }`}
+            >
+              Semua Waktu
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('daily')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                filterType === 'daily'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-950'
+              }`}
+            >
+              Harian
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('monthly')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                filterType === 'monthly'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-950'
+              }`}
+            >
+              Bulanan
+            </button>
+          </div>
+        </div>
+
+        {/* Conditional Controls for Day / Month selection */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          {filterType === 'daily' && (
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <span className="text-xs font-semibold text-neutral-500">Pilih Tanggal:</span>
+              <input
+                type="date"
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="px-3 py-2 border border-neutral-300 rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-neutral-950 bg-white"
+              />
+            </div>
+          )}
+
+          {filterType === 'monthly' && (
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-neutral-500">Bulan:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="px-3 py-2 border border-neutral-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-neutral-950 bg-white cursor-pointer"
+                >
+                  {MONTHS_ID.map((name, index) => (
+                    <option key={index} value={index}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-neutral-500">Tahun:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-3 py-2 border border-neutral-300 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-neutral-950 bg-white cursor-pointer"
+                >
+                  {[2024, 2025, 2026, 2027, 2028].map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendMonthlyReportWA}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-white" />
+                <span>Kirim Rekap Bulanan ke WA</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-neutral-200 rounded-2xl p-5 shadow-2xs">
@@ -135,7 +286,7 @@ export const ReportsView: React.FC = () => {
             {formatRupiah(totalRevenue)}
           </div>
           <span className="text-[11px] text-neutral-500 mt-1 block">
-            Dari {transactions.length} transaksi selesai
+            Dari {filteredTransactions.length} transaksi selesai
           </span>
         </div>
 
@@ -159,7 +310,7 @@ export const ReportsView: React.FC = () => {
             {totalItemsSold} item
           </div>
           <span className="text-[11px] text-neutral-500 mt-1 block">
-            Rata-rata {(totalItemsSold / (transactions.length || 1)).toFixed(1)} item/struk
+            Rata-rata {(totalItemsSold / (filteredTransactions.length || 1)).toFixed(1)} item/struk
           </span>
         </div>
 
@@ -226,13 +377,13 @@ export const ReportsView: React.FC = () => {
             <div className="flex justify-between py-1.5 border-b border-neutral-100">
               <span>Rata-rata Nilai Belanja Per Struk (AOV):</span>
               <strong className="font-mono text-neutral-900">
-                {formatRupiah(totalRevenue / (transactions.length || 1))}
+                {formatRupiah(totalRevenue / (filteredTransactions.length || 1))}
               </strong>
             </div>
             <div className="flex justify-between py-1.5 border-b border-neutral-100">
               <span>Metode Pembayaran Paling Sering:</span>
               <strong className="text-neutral-900 uppercase">
-                {transactions.length > 0 ? transactions[0].paymentMethod : '-'}
+                {filteredTransactions.length > 0 ? filteredTransactions[0].paymentMethod : '-'}
               </strong>
             </div>
             <div className="flex justify-between py-1.5">
