@@ -142,7 +142,20 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [settings, setSettings] = useState<StoreSettings>(() => {
     const saved = localStorage.getItem('kasirku_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.storeName || parsed.storeName === 'Toko Berkah Bersama') {
+          parsed.storeName = 'KOPDES SENDANG DAJAH';
+          parsed.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
+          parsed.adminWaPhone = '085704800313';
+        }
+        return parsed;
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return INITIAL_SETTINGS;
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
@@ -181,9 +194,11 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // we must target the absolute URL of the deployment server.
     if (
       window.location.protocol === 'file:' ||
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      (!window.location.hostname.includes('run.app') && !window.location.hostname.includes('localhost'))
+      (
+        !window.location.hostname.includes('run.app') &&
+        !window.location.hostname.includes('vercel.app') &&
+        !window.location.hostname.includes('localhost')
+      )
     ) {
       return `https://ais-pre-5ifxiuva2vp7wnisdevtp3-459294540144.asia-southeast1.run.app${path}`;
     }
@@ -211,7 +226,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then((resData) => {
         if (resData.success && resData.data) {
           const d = resData.data;
-          if (d.settings) setSettings(d.settings);
+          if (d.settings) {
+            if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
+              d.settings.storeName = 'KOPDES SENDANG DAJAH';
+              d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
+              d.settings.adminWaPhone = '085704800313';
+            }
+            setSettings(d.settings);
+          }
           if (d.products) setProducts(d.products);
           if (d.stockMovements) setStockMovements(d.stockMovements);
           if (d.transactions) setTransactions(d.transactions);
@@ -234,8 +256,15 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then((resData) => {
           if (resData.success && resData.data) {
             const d = resData.data;
-            if (d.settings && JSON.stringify(d.settings) !== JSON.stringify(settings)) {
-              setSettings(d.settings);
+            if (d.settings) {
+              if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
+                d.settings.storeName = 'KOPDES SENDANG DAJAH';
+                d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
+                d.settings.adminWaPhone = '085704800313';
+              }
+              if (JSON.stringify(d.settings) !== JSON.stringify(settings)) {
+                setSettings(d.settings);
+              }
             }
             if (d.products && JSON.stringify(d.products) !== JSON.stringify(products)) {
               setProducts(d.products);

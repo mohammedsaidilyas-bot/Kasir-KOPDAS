@@ -28,11 +28,11 @@ export const INITIAL_CASHIERS: CashierUser[] = [
 ];
 
 export const INITIAL_SETTINGS: StoreSettings = {
-  storeName: 'Toko Berkah Bersama',
-  tagline: 'Pusat Belanja Grosir, Eceran & Kartonan Terpercaya',
-  address: 'Jl. Raya Perintis Kemerdekaan No. 45, Jakarta',
+  storeName: 'KOPDES SENDANG DAJAH',
+  tagline: 'Pusat Belanja Grosir & Eceran Terpercaya',
+  address: 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan',
   phone: '0812-3456-7890',
-  adminWaPhone: '081234567890',
+  adminWaPhone: '085704800313',
   receiptFooter: 'Simpan struk ini sebagai bukti pembayaran yang sah. Terima kasih!',
   pinKasir: '1234',
   pinPengelola: '5678',

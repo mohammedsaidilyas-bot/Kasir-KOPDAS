@@ -65,10 +65,12 @@ app.post('/api/save', (req, res) => {
 });
 
 // Serve frontend
-if (process.env.NODE_ENV === 'production' || process.env.PROD === 'true') {
-  app.use(express.static(path.join(__dirname, 'dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(path.join(distPath, 'index.html'))) {
+  app.use(express.static(distPath));
+  app.use('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {
   // Mount Vite dev middlewares
@@ -78,6 +80,19 @@ if (process.env.NODE_ENV === 'production' || process.env.PROD === 'true') {
     appType: 'spa',
   });
   app.use(vite.middlewares);
+
+  app.use('*', async (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) return next();
+    try {
+      const url = req.originalUrl;
+      let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+      template = await vite.transformIndexHtml(url, template);
+      res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+    } catch (e) {
+      vite.ssrFixStacktrace(e as Error);
+      next(e);
+    }
+  });
 }
 
 app.listen(PORT, '0.0.0.0', () => {
