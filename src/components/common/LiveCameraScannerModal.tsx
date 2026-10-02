@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, ShieldCheck, AlertCircle, Zap } from 'lucide-react';
+import { X, Camera, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface LiveCameraScannerModalProps {
@@ -18,23 +18,18 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<any>(null);
-  const isScanningRef = useRef<boolean>(false);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
-  const stopCamera = () => {
-    isScanningRef.current = false;
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+  const stopCamera = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        if (html5QrCodeRef.current.isScanning) {
+          await html5QrCodeRef.current.stop();
+        }
+      } catch (err) {
+        console.error('Error stopping scanner:', err);
+      }
+      html5QrCodeRef.current = null;
     }
   };
 
@@ -45,103 +40,46 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
     await stopCamera();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false,
-      });
+      const elementId = 'html5-qrcode-scanner-view';
+      const scanner = new Html5Qrcode(elementId);
+      html5QrCodeRef.current = scanner;
 
-      streamRef.current = stream;
       setPermissionState('granted');
       setIsLoading(false);
-      isScanningRef.current = true;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
+      // Highly sensitive config for barcodes (high fps, multiple formats)
+      const config = {
+        fps: 24, // 24 frames per second scan rate for ultra-sensitivity
+        qrbox: (width: number, height: number) => {
+          // Wider box optimized for reading linear 1D barcodes
+          const boxWidth = Math.min(width * 0.85, 320);
+          const boxHeight = Math.min(height * 0.45, 160);
+          return { width: boxWidth, height: boxHeight };
+        },
+        aspectRatio: 1.777778, // 16:9 viewport
+      };
 
-      const html5QrCode = new Html5Qrcode('html5-qrcode-hidden-decoder');
-      
-      intervalRef.current = setInterval(async () => {
-        if (!isScanningRef.current || !videoRef.current) return;
-        const video = videoRef.current;
-        if (video.videoWidth === 0 || video.videoHeight === 0) return;
-
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-          canvas.toBlob(async (blob) => {
-            if (!blob || !isScanningRef.current) return;
-            const file = new File([blob], 'frame.jpg', { type: 'image/jpeg' });
-            try {
-              const decodedText = await html5QrCode.scanFile(file, false);
-              if (decodedText && isScanningRef.current) {
-                isScanningRef.current = false;
-                stopCamera();
-                setPermissionState('prompt');
-                onScanSuccess(decodedText);
-                onClose();
-              }
-            } catch (err) {
-              // Frame not decoded yet, keep scanning
-            }
-          }, 'image/jpeg', 0.85);
-        } catch (e) {
-          // Ignore frame capture error
+      await scanner.start(
+        { facingMode: 'environment' },
+        config,
+        (decodedText) => {
+          // Success callback
+          stopCamera();
+          setPermissionState('prompt');
+          onScanSuccess(decodedText);
+          onClose();
+        },
+        () => {
+          // Failure callback - silent, continues scanning
         }
-      }, 300);
-
+      );
     } catch (err: any) {
       console.error('Fast camera start error:', err);
       setIsLoading(false);
       setPermissionState('denied');
       setErrorMsg(
-        'Kamera gagal dimulai. Pastikan izin kamera diizinkan di aplikasi WebIntoApp.'
+        'Kamera gagal dimulai atau izin ditolak. Pastikan izin kamera telah diberikan di pengaturan browser/perangkat Anda.'
       );
-    }
-  };
-
-  const handleManualSnap = async () => {
-    if (!videoRef.current || !isScanningRef.current) return;
-    const video = videoRef.current;
-    if (video.videoWidth === 0) return;
-
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        const file = new File([blob], 'snapshot.jpg', { type: 'image/jpeg' });
-        try {
-          const html5QrCode = new Html5Qrcode('html5-qrcode-hidden-decoder');
-          const decodedText = await html5QrCode.scanFile(file, true);
-          if (decodedText && isScanningRef.current) {
-            isScanningRef.current = false;
-            stopCamera();
-            setPermissionState('prompt');
-            onScanSuccess(decodedText);
-            onClose();
-          }
-        } catch (e) {
-          alert('Barcode belum terdeteksi. Posisikan barcode tepat di tengah kotak.');
-        }
-      }, 'image/jpeg', 0.95);
-    } catch (e) {
-      alert('Gagal memindai foto.');
     }
   };
 
@@ -186,8 +124,11 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 text-left">
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Kamera Super Cepat</span>
+              <span>Kamera Sensitif & Kilat</span>
             </div>
+            <p className="text-xs text-neutral-600">
+              Aplikasi ini menggunakan scanner bar-code otomatis bersensitivitas tinggi. Deteksi langsung terjadi seketika saat kamera diarahkan ke barcode.
+            </p>
             <button
               type="button"
               onClick={startCamera}
@@ -203,7 +144,7 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 text-left">
             <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
               <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-              <span>Izin Kamera</span>
+              <span>Izin Kamera Dibutuhkan</span>
             </div>
             <p className="text-[11px] text-amber-800 leading-relaxed">{errorMsg}</p>
             <button
@@ -216,42 +157,22 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </div>
         )}
 
-        {/* Ultra-Fast Video Stream Viewport */}
+        {/* Real-time HTML5-QRCode Scanner Viewport */}
         <div className={`space-y-3 ${permissionState !== 'granted' ? 'hidden' : 'block'}`}>
-          <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[260px] flex items-center justify-center shadow-inner">
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              autoPlay
-              className="w-full h-[260px] object-cover"
-            />
+          <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 shadow-inner">
+            {/* Target element for html5-qrcode */}
+            <div id="html5-qrcode-scanner-view" className="w-full min-h-[260px] overflow-hidden bg-black" />
             
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-36 border-2 border-emerald-400 rounded-xl shadow-2xl relative flex items-center justify-center animate-pulse">
-                <div className="absolute w-full h-0.5 bg-rose-500 top-1/2 -translate-y-1/2 animate-bounce" />
-              </div>
-            </div>
-
             {isLoading && (
               <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs z-20">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                <span>Membuka kamera kilat...</span>
+                <span>Membuka kamera sensitif...</span>
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleManualSnap}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Zap className="w-4 h-4 text-emerald-200 fill-emerald-200" />
-            <span>📸 AMBIL & SCAN BARCODE SEKARANG</span>
-          </button>
-
           <p className="text-xs text-neutral-600 font-medium">
-            ⚡ Kamera menyala seketika. Arahkan ke barcode atau tekan tombol <strong>Ambil & Scan</strong> untuk deteksi kilat.
+            ⚡ <strong>Deteksi Instan Aktif</strong>: Arahkan barcode tepat ke tengah kotak pemindai. Kamera akan membaca secara instan & sensitif tanpa menekan tombol apapun!
           </p>
         </div>
 
@@ -270,8 +191,6 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
             Atau gunakan Barcode Otomatis (Simulasi)
           </button>
         </div>
-
-        <div id="html5-qrcode-hidden-decoder" className="hidden" />
       </div>
     </div>
   );
