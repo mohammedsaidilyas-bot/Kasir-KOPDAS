@@ -36,7 +36,24 @@ export const ProductCatalogView: React.FC = () => {
     minWholesaleQty: 5,
     stock: 0,
     minStockAlert: 5,
+    hasBox: true,
+    boxQty: 24,
+    boxCostPrice: 0,
+    boxPrice: 0,
+    boxUnit: 'dus',
   });
+
+  // Dual stock helper states (for entering stock as Dus + loose Pcs)
+  const [stokDus, setStokDus] = useState<number>(0);
+  const [sisaPcs, setSisaPcs] = useState<number>(0);
+
+  // Auto-calculate total base stock when stokDus, sisaPcs or boxQty changes
+  React.useEffect(() => {
+    if (formData.hasBox) {
+      const calculatedStock = (stokDus * formData.boxQty) + sisaPcs;
+      setFormData((prev) => ({ ...prev, stock: calculatedStock }));
+    }
+  }, [stokDus, sisaPcs, formData.boxQty, formData.hasBox]);
 
   const categories = ['Semua', ...Array.from(new Set(products.map((p) => p.category)))];
 
@@ -51,9 +68,16 @@ export const ProductCatalogView: React.FC = () => {
       retailPrice: 13000,
       wholesalePrice: 11500,
       minWholesaleQty: 6,
-      stock: 20,
+      stock: 240, // 10 dus x 24
       minStockAlert: 5,
+      hasBox: true,
+      boxQty: 24,
+      boxCostPrice: 210000,
+      boxPrice: 240000,
+      boxUnit: 'dus',
     });
+    setStokDus(10);
+    setSisaPcs(0);
     setIsModalOpen(true);
   };
 
@@ -70,7 +94,15 @@ export const ProductCatalogView: React.FC = () => {
       minWholesaleQty: p.minWholesaleQty,
       stock: p.stock,
       minStockAlert: p.minStockAlert,
+      hasBox: p.hasBox ?? true,
+      boxQty: p.boxQty || 24,
+      boxCostPrice: p.boxCostPrice || 0,
+      boxPrice: p.boxPrice || 0,
+      boxUnit: p.boxUnit || 'dus',
     });
+    const qtyPerBox = p.boxQty || 24;
+    setStokDus(Math.floor(p.stock / qtyPerBox));
+    setSisaPcs(p.stock % qtyPerBox);
     setIsModalOpen(true);
   };
 
@@ -165,12 +197,11 @@ export const ProductCatalogView: React.FC = () => {
               <tr>
                 <th className="py-3 px-4">Nama Produk & Barcode</th>
                 <th className="py-3 px-4">Kategori</th>
-                <th className="py-3 px-4">Satuan</th>
-                <th className="py-3 px-4">Harga Modal</th>
-                <th className="py-3 px-4">Harga Eceran</th>
-                <th className="py-3 px-4">Harga Grosir (Min. Qty)</th>
-                <th className="py-3 px-4">Selisih Hemat Grosir</th>
-                <th className="py-3 px-4 text-center">Stok</th>
+                <th className="py-3 px-4">Harga Modal (HPP)</th>
+                <th className="py-3 px-4">Harga Eceran (Satuan)</th>
+                <th className="py-3 px-4">Harga Grosir (Otomatis ≥6)</th>
+                <th className="py-3 px-4">Harga Per Dus / Karton</th>
+                <th className="py-3 px-4">Stok (Satuan & Dus)</th>
                 <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
@@ -181,6 +212,10 @@ export const ProductCatalogView: React.FC = () => {
                 const diffPrice = p.retailPrice - p.wholesalePrice;
                 const percentDiff = ((diffPrice / p.retailPrice) * 100).toFixed(0);
 
+                const hasBoxConfig = p.hasBox && p.boxQty && p.boxPrice;
+                const equivalentDus = hasBoxConfig ? Math.floor(p.stock / p.boxQty) : 0;
+                const remainderPcs = hasBoxConfig ? p.stock % p.boxQty : p.stock;
+
                 return (
                   <tr key={p.id} className="hover:bg-neutral-50/80 transition-colors">
                     <td className="py-3 px-4 font-semibold text-neutral-900">
@@ -188,38 +223,59 @@ export const ProductCatalogView: React.FC = () => {
                       <span className="text-[10px] font-mono text-neutral-400">{p.sku}</span>
                     </td>
                     <td className="py-3 px-4 text-neutral-600">{p.category}</td>
-                    <td className="py-3 px-4 text-neutral-600 uppercase font-mono">{p.unit}</td>
-                    <td className="py-3 px-4 font-mono text-neutral-600">{formatRupiah(p.costPrice)}</td>
+                    <td className="py-3 px-4 font-mono text-neutral-600">
+                      <div className="font-medium text-neutral-700">{formatRupiah(p.costPrice)}/{p.unit}</div>
+                      {hasBoxConfig && p.boxCostPrice > 0 && (
+                        <div className="text-[10px] text-blue-600 font-medium">
+                          Dus: {formatRupiah(p.boxCostPrice)}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-4 font-mono">
                       <div className="font-semibold text-neutral-900">{formatRupiah(p.retailPrice)}</div>
-                      <div className="text-[10px] text-neutral-500 font-medium">
+                      <div className="text-[10px] text-emerald-700 font-medium">
                         Laba: {formatRupiah(profitEcer)}
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono">
-                      <div className="font-semibold text-emerald-700">
+                      <div className="font-semibold text-emerald-800">
                         {formatRupiah(p.wholesalePrice)}
                       </div>
                       <div className="text-[10px] text-neutral-500">
-                        min. {p.minWholesaleQty} {p.unit} (Laba: {formatRupiah(profitGrosir)})
+                        min. {p.minWholesaleQty || 6} {p.unit} (Laba: {formatRupiah(profitGrosir)})
                       </div>
                     </td>
                     <td className="py-3 px-4 font-mono">
-                      <div className="text-emerald-700 font-bold">
-                        Hemat {formatRupiah(diffPrice)}
-                      </div>
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                        {percentDiff}% Lebih Murah
-                      </span>
+                      {hasBoxConfig ? (
+                        <>
+                          <div className="font-semibold text-blue-700">{formatRupiah(p.boxPrice)}</div>
+                          <div className="text-[10px] text-neutral-500">
+                            Isi {p.boxQty} {p.unit} ({p.boxUnit || 'dus'})
+                          </div>
+                          {p.boxCostPrice > 0 && (
+                            <div className="text-[10px] text-emerald-700 font-bold">
+                              Laba: {formatRupiah(p.boxPrice - p.boxCostPrice)}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-neutral-400 italic">Tidak Aktif</span>
+                      )}
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-bold">
-                      {p.stock}
+                    <td className="py-3 px-4 font-mono">
+                      <div className="font-bold text-neutral-900">{p.stock} {p.unit}</div>
+                      {hasBoxConfig && p.stock >= p.boxQty && (
+                        <div className="text-[10px] text-blue-700 font-semibold">
+                          = {equivalentDus} {p.boxUnit || 'dus'}{' '}
+                          {remainderPcs > 0 ? `+ ${remainderPcs} ${p.unit}` : ''}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right space-x-1">
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(p)}
-                        className="p-1.5 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                        className="p-1.5 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors cursor-pointer"
                         title="Edit data produk"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -227,7 +283,7 @@ export const ProductCatalogView: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleDelete(p.id, p.name)}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Hapus produk"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -384,20 +440,57 @@ export const ProductCatalogView: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Stok Awal:
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.stock}
-                    onChange={(e) =>
-                      setFormData({ ...formData, stock: Math.max(0, parseInt(e.target.value) || 0) })
-                    }
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                  />
-                </div>
+                {formData.hasBox ? (
+                  <div className="space-y-1 sm:col-span-2 bg-neutral-100/50 p-2.5 rounded-xl border border-neutral-200">
+                    <span className="block text-[11px] font-bold text-neutral-800 mb-1">
+                      Stok Awal (Dihitung dari Jumlah Dus):
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-medium text-neutral-500 mb-0.5">
+                          Jumlah Dus ({formData.boxUnit || 'dus'}):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={stokDus}
+                          onChange={(e) => setStokDus(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full px-2.5 py-1.5 border border-neutral-200 bg-white rounded-lg text-xs font-mono font-bold focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-neutral-500 mb-0.5">
+                          Sisa Item ({formData.unit}):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={sisaPcs}
+                          onChange={(e) => setSisaPcs(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full px-2.5 py-1.5 border border-neutral-200 bg-white rounded-lg text-xs font-mono font-bold focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-neutral-500 font-semibold pt-1">
+                      Total Stok Terhitung: <strong className="text-neutral-900 font-bold">{formData.stock} {formData.unit}</strong> ({stokDus} {formData.boxUnit || 'dus'} x {formData.boxQty} + {sisaPcs} {formData.unit})
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      Stok Awal ({formData.unit}):
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.stock}
+                      onChange={(e) =>
+                        setFormData({ ...formData, stock: Math.max(0, parseInt(e.target.value) || 0) })
+                      }
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-neutral-700 mb-1">
@@ -416,6 +509,104 @@ export const ProductCatalogView: React.FC = () => {
                     className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-neutral-900"
                   />
                 </div>
+              </div>
+
+              {/* Opsi Penjualan Per Dus */}
+              <div className="bg-neutral-50 rounded-2xl p-4 border border-neutral-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasBox}
+                      onChange={(e) => setFormData({ ...formData, hasBox: e.target.checked })}
+                      className="rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 w-4 h-4"
+                    />
+                    <span className="text-xs font-bold text-neutral-800">
+                      Aktifkan Penjualan Per Dus (Kartonan/Box)
+                    </span>
+                  </label>
+                  <span className="text-[10px] bg-blue-50 text-blue-800 border border-blue-200 font-semibold px-2 py-0.5 rounded-full">
+                    Grosir & Kartonan
+                  </span>
+                </div>
+
+                {formData.hasBox && (
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-in fade-in duration-200">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Isi per Dus (Satuan ecer):
+                      </label>
+                      <input
+                        type="number"
+                        min="2"
+                        required
+                        value={formData.boxQty}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            boxQty: Math.max(2, parseInt(e.target.value) || 2),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-neutral-200 bg-white rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                        placeholder="Contoh: 40 bks / 12 botol"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Harga Kolakan/Modal Dus:
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formData.boxCostPrice}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            boxCostPrice: Math.max(0, parseInt(e.target.value) || 0),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-neutral-200 bg-white rounded-xl text-xs font-mono font-bold text-neutral-700 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                        placeholder="Harga Beli Dus"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Harga Jual per Dus:
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={formData.boxPrice}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            boxPrice: Math.max(0, parseInt(e.target.value) || 0),
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-neutral-200 bg-white rounded-xl text-xs font-mono font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                        placeholder="Contoh: 120000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Satuan Dus:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.boxUnit}
+                        onChange={(e) => setFormData({ ...formData, boxUnit: e.target.value })}
+                        className="w-full px-3 py-2 border border-neutral-200 bg-white rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                        placeholder="dus / karton / box / bal"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3">

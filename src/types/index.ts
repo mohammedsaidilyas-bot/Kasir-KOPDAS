@@ -16,6 +16,7 @@ export interface Product {
   minWholesaleQty: number; // Minimal beli grosir otomatis (default: 6)
   hasBox: boolean; // Apakah ada opsi jual per dus?
   boxQty: number; // Isi per dus (misal: 40 pcs / 24 pcs / 12 pcs)
+  boxCostPrice: number; // Harga Modal / Kolakan per dus
   boxPrice: number; // Harga jual per 1 dus
   boxUnit?: string; // 'dus' | 'karton' | 'box'
   stock: number; // Total stok dalam satuan item dasar

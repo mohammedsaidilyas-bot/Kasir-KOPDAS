@@ -9,6 +9,7 @@ import {
   QrCode,
   Layers,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { SaleTransaction, PaymentMethod, PriceType } from '../../types';
@@ -20,7 +21,7 @@ import {
 import { ReceiptModal } from '../pos/ReceiptModal';
 
 export const TransactionHistoryView: React.FC = () => {
-  const { transactions } = usePos();
+  const { transactions, currentRole, deleteTransaction } = usePos();
 
   const [search, setSearch] = useState('');
   const [filterMethod, setFilterMethod] = useState<string>('semua');
@@ -167,7 +168,7 @@ export const TransactionHistoryView: React.FC = () => {
                 <th className="py-3 px-4">Jumlah Item</th>
                 <th className="py-3 px-4">Metode Bayar</th>
                 <th className="py-3 px-4 text-right">Total Transaksi</th>
-                <th className="py-3 px-4 text-center">Struk</th>
+                <th className="py-3 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
@@ -212,18 +213,39 @@ export const TransactionHistoryView: React.FC = () => {
                   <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-neutral-900">
                     {formatRupiah(trx.grandTotal)}
                   </td>
-                  <td className="py-3.5 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center space-x-1.5 whitespace-nowrap">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenReceipt(trx);
                       }}
-                      className="px-2.5 py-1 text-xs font-semibold bg-neutral-100 hover:bg-neutral-900 hover:text-white rounded-lg transition-colors inline-flex items-center gap-1"
+                      className="px-2.5 py-1 text-xs font-semibold bg-neutral-100 hover:bg-neutral-900 hover:text-white rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
                     >
                       <Printer className="w-3 h-3" />
                       <span>Cetak</span>
                     </button>
+
+                    {currentRole === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            confirm(
+                              `Apakah Anda yakin ingin menghapus struk ${trx.id} secara permanen?\n\nPERINGATAN: Stok sebanyak ${trx.totalQty} barang dalam transaksi ini akan dikembalikan otomatis ke inventaris!`
+                            )
+                          ) {
+                            deleteTransaction(trx.id);
+                          }
+                        }}
+                        className="px-2.5 py-1 text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Hapus struk transaksi & kembalikan stok"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Hapus</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

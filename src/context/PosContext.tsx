@@ -84,6 +84,7 @@ interface PosContextType {
     changeDue?: number,
     referenceNo?: string
   ) => SaleTransaction | null;
+  deleteTransaction: (id: string) => void;
   latestTransaction: SaleTransaction | null;
   setLatestTransaction: (trx: SaleTransaction | null) => void;
 
@@ -677,6 +678,58 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newTrx;
   };
 
+  const deleteTransaction = (trxId: string) => {
+    // 1. Find transaction to delete
+    const targetTrx = transactions.find((t) => t.id === trxId);
+    if (!targetTrx) return;
+
+    // 2. Perform Stock Reversal for each item in the transaction
+    const stockReversals: StockMovement[] = [];
+    const updatedProducts = products.map((prod) => {
+      const soldItems = targetTrx.items.filter((item) => item.product.id === prod.id);
+      if (soldItems.length > 0) {
+        const totalPcsToRestore = soldItems.reduce((acc, itm) => {
+          if (itm.priceType === 'dus') {
+            return acc + itm.qty * (itm.product.boxQty || 1);
+          }
+          return acc + itm.qty;
+        }, 0);
+
+        const prevStock = prod.stock;
+        const newStock = prevStock + totalPcsToRestore;
+
+        stockReversals.push({
+          id: `MOV-REV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          productId: prod.id,
+          productName: prod.name,
+          type: 'masuk',
+          qty: totalPcsToRestore,
+          previousStock: prevStock,
+          newStock,
+          reason: 'retur_pelanggan',
+          notes: `Reversal / Pembatalan Struk ${trxId} oleh Admin`,
+          timestamp: new Date().toISOString(),
+          operator: currentUserName,
+        });
+
+        return {
+          ...prod,
+          stock: newStock,
+        };
+      }
+      return prod;
+    });
+
+    // 3. Update states
+    setProducts(updatedProducts);
+    setStockMovements((prev) => [...stockReversals, ...prev]);
+    setTransactions((prev) => prev.filter((t) => t.id !== trxId));
+
+    if (latestTransaction?.id === trxId) {
+      setLatestTransaction(null);
+    }
+  };
+
   // Stock In (Barang Masuk)
   const recordStockIn = (
     productId: string,
@@ -857,6 +910,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cartWholesaleSavings,
         transactions,
         completeTransaction,
+        deleteTransaction,
         latestTransaction,
         setLatestTransaction,
         stockMovements,
