@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, ShieldCheck, AlertCircle, Zap } from 'lucide-react';
+import { X, Camera, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface LiveCameraScannerModalProps {
@@ -13,18 +13,24 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
   isOpen,
   onClose,
   onScanSuccess,
-  title = 'Scan Barcode Kamera',
+  title = 'Scan Barcode Otomatis',
 }) => {
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isProcessingSnap, setIsProcessingSnap] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const intervalRef = useRef<any>(null);
   const readerDivId = 'html5-qr-reader-live-view';
+  const isScanningRef = useRef<boolean>(false);
 
   const stopCamera = () => {
+    isScanningRef.current = false;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -51,12 +57,14 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
       streamRef.current = stream;
       setPermissionState('granted');
       setIsLoading(false);
+      isScanningRef.current = true;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
       }
 
+      // 1. Start Html5Qrcode continuous auto-scan stream
       setTimeout(async () => {
         try {
           const html5QrCode = new Html5Qrcode(readerDivId);
@@ -65,10 +73,13 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           await html5QrCode.start(
             { facingMode: 'environment' },
             {
-              fps: 15,
-              qrbox: { width: 280, height: 160 },
+              fps: 25,
+              qrbox: { width: 300, height: 180 },
+              aspectRatio: 1.777778,
             },
             (decodedText) => {
+              if (!isScanningRef.current) return;
+              isScanningRef.current = false;
               stopCamera();
               setPermissionState('prompt');
               onScanSuccess(decodedText);
@@ -79,64 +90,49 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
         } catch (err: any) {
           console.warn('Html5Qrcode live start warning:', err);
         }
-      }, 400);
+      }, 300);
+
+      // 2. High-Frequency Automated Frame Analysis Loop (Every 350ms)
+      const qrDecoder = new Html5Qrcode('html5-qrcode-auto-hidden');
+      intervalRef.current = setInterval(async () => {
+        if (!isScanningRef.current || !videoRef.current) return;
+        const video = videoRef.current;
+        if (video.videoWidth === 0 || video.videoHeight === 0) return;
+
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          canvas.toBlob(async (blob) => {
+            if (!blob || !isScanningRef.current) return;
+            const file = new File([blob], 'auto-scan.jpg', { type: 'image/jpeg' });
+            try {
+              const text = await qrDecoder.scanFile(file, false);
+              if (text && isScanningRef.current) {
+                isScanningRef.current = false;
+                stopCamera();
+                setPermissionState('prompt');
+                onScanSuccess(text);
+                onClose();
+              }
+            } catch (e) {
+              // Ignore until barcode is detected
+            }
+          }, 'image/jpeg', 0.9);
+        } catch (e) {
+          // Ignore
+        }
+      }, 350);
 
     } catch (err: any) {
       console.error('Live camera error:', err);
       setIsLoading(false);
       setPermissionState('denied');
-      setErrorMsg(
-        'Akses kamera dibatasi. Pastikan izin kamera diaktifkan.'
-      );
-    }
-  };
-
-  const handleSnapAndDecode = async () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      alert('Kamera belum siap sepenuhnya. Mohon tunggu 1 detik.');
-      return;
-    }
-
-    try {
-      setIsProcessingSnap(true);
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setIsProcessingSnap(false);
-        return;
-      }
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          setIsProcessingSnap(false);
-          alert('Gagal mengambil foto dari kamera.');
-          return;
-        }
-
-        const file = new File([blob], 'barcode-snapshot.jpg', { type: 'image/jpeg' });
-        try {
-          const qr = new Html5Qrcode('html5-qrcode-snapshot-hidden');
-          const decodedText = await qr.scanFile(file, true);
-          setIsProcessingSnap(false);
-          stopCamera();
-          setPermissionState('prompt');
-          onScanSuccess(decodedText);
-          onClose();
-        } catch (scanErr) {
-          setIsProcessingSnap(false);
-          alert('Barcode tidak terdeteksi pada foto ini. Pastikan posisi barcode tepat di tengah kotak dan pencahayaan terang.');
-        }
-      }, 'image/jpeg', 0.95);
-
-    } catch (err) {
-      setIsProcessingSnap(false);
-      alert('Terjadi kesalahan saat memindai foto.');
+      setErrorMsg('Akses kamera dibatasi. Pastikan izin kamera diaktifkan.');
     }
   };
 
@@ -146,7 +142,6 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
       setPermissionState('prompt');
       setErrorMsg('');
       setIsLoading(false);
-      setIsProcessingSnap(false);
       return;
     }
 
@@ -213,20 +208,20 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </div>
         )}
 
-        {/* Live Camera Viewport */}
+        {/* Live Camera Viewport with Auto-Scan */}
         <div className={`space-y-3 ${permissionState !== 'granted' ? 'hidden' : 'block'}`}>
-          <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[240px] flex items-center justify-center shadow-inner">
+          <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[260px] flex items-center justify-center shadow-inner">
             <video
               ref={videoRef}
               playsInline
               muted
               autoPlay
-              className="w-full h-[240px] object-cover"
+              className="w-full h-[260px] object-cover"
             />
             
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-32 border-2 border-emerald-400 rounded-xl shadow-2xl relative flex items-center justify-center">
-                <div className="absolute w-full h-0.5 bg-rose-500 top-1/2 -translate-y-1/2 animate-pulse" />
+              <div className="w-64 h-36 border-2 border-emerald-400 rounded-xl shadow-2xl relative flex items-center justify-center animate-pulse">
+                <div className="absolute w-full h-0.5 bg-rose-500 top-1/2 -translate-y-1/2 animate-bounce" />
               </div>
             </div>
 
@@ -235,23 +230,13 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
             {isLoading && (
               <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                <span>Menyalakan kamera...</span>
+                <span>Menyalakan kamera otomatis...</span>
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleSnapAndDecode}
-            disabled={isProcessingSnap}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-          >
-            <Zap className="w-4 h-4 text-emerald-200 fill-emerald-200" />
-            <span>{isProcessingSnap ? 'Memproses Barcode...' : '📸 AMBIL & DETEKSI BARCODE SEKARANG'}</span>
-          </button>
-
-          <p className="text-[11px] text-neutral-500">
-            Arahkan barcode ke dalam kotak merah, lalu tekan tombol <strong>Ambil & Deteksi</strong> di atas agar terbaca seketika.
+          <p className="text-xs text-neutral-600 font-medium">
+            🔍 Memindai barcode secara <strong>otomatis</strong>... Arahkan kamera ke barcode produk.
           </p>
         </div>
 
@@ -271,7 +256,7 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </button>
         </div>
 
-        <div id="html5-qrcode-snapshot-hidden" className="hidden" />
+        <div id="html5-qrcode-auto-hidden" className="hidden" />
       </div>
     </div>
   );
