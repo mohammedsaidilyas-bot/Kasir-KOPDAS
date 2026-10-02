@@ -365,48 +365,45 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(interval);
   }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
 
-  // 3. Save to server whenever state changes from LOCAL USER action
-  useEffect(() => {
-    if (!hasLoadedFromServer) return;
-
-    if (isUpdatingFromServerRef.current) {
-      // Received update from server, do not echo back
-      isUpdatingFromServerRef.current = false;
-      return;
-    }
-
+  // 3. Central explicit function to save data to server & localStorage
+  const saveToServer = (overrides?: {
+    settings?: StoreSettings;
+    products?: Product[];
+    stockMovements?: StockMovement[];
+    transactions?: SaleTransaction[];
+    cashiers?: CashierUser[];
+  }) => {
     // Start 4-second mutation cooldown so polling doesn't overwrite our local changes
     lastMutationTimeRef.current = Date.now();
 
-    // Save to localStorage as local backup
-    localStorage.setItem('kasirku_settings', JSON.stringify(settings));
-    localStorage.setItem('kasirku_products', JSON.stringify(products));
-    localStorage.setItem('kasirku_movements', JSON.stringify(stockMovements));
-    localStorage.setItem('kasirku_transactions', JSON.stringify(transactions));
-    localStorage.setItem('kasirku_cashiers', JSON.stringify(cashiers));
+    const payload = {
+      settings: overrides?.settings !== undefined ? overrides.settings : settings,
+      products: overrides?.products !== undefined ? overrides.products : products,
+      stockMovements: overrides?.stockMovements !== undefined ? overrides.stockMovements : stockMovements,
+      transactions: overrides?.transactions !== undefined ? overrides.transactions : transactions,
+      cashiers: overrides?.cashiers !== undefined ? overrides.cashiers : cashiers,
+    };
 
-    // Post to Express backend
+    // Save to localStorage as backup
+    localStorage.setItem('kasirku_settings', JSON.stringify(payload.settings));
+    localStorage.setItem('kasirku_products', JSON.stringify(payload.products));
+    localStorage.setItem('kasirku_movements', JSON.stringify(payload.stockMovements));
+    localStorage.setItem('kasirku_transactions', JSON.stringify(payload.transactions));
+    localStorage.setItem('kasirku_cashiers', JSON.stringify(payload.cashiers));
+
     fetch(getApiUrl('/api/save'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: {
-          settings,
-          products,
-          stockMovements,
-          transactions,
-          cashiers,
-        },
-      }),
+      body: JSON.stringify({ data: payload }),
     })
       .then((res) => res.json())
       .then((resData) => {
         if (!resData.success) {
-          console.error("Server save returned success=false");
+          console.error("Server save failed");
         }
       })
       .catch((err) => console.error("Failed to save to server:", err));
-  }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
+  };
 
   // Cashier management
   const addCashier = (name: string, pin: string): CashierUser => {
@@ -418,21 +415,31 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isActive: true,
       createdAt: new Date().toISOString(),
     };
-    setCashiers((prev) => [...prev, newCashier]);
+    setCashiers((prev) => {
+      const next = [...prev, newCashier];
+      saveToServer({ cashiers: next });
+      return next;
+    });
     return newCashier;
   };
 
   const updateCashier = (id: string, name: string, pin: string, isActive: boolean) => {
-    setCashiers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, name: name.trim(), pin: pin.trim(), isActive } : c))
-    );
+    setCashiers((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, name: name.trim(), pin: pin.trim(), isActive } : c));
+      saveToServer({ cashiers: next });
+      return next;
+    });
     if (currentCashier?.id === id) {
       setCurrentCashier((prev) => (prev ? { ...prev, name: name.trim(), pin: pin.trim(), isActive } : null));
     }
   };
 
   const deleteCashier = (id: string) => {
-    setCashiers((prev) => prev.filter((c) => c.id !== id));
+    setCashiers((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      saveToServer({ cashiers: next });
+      return next;
+    });
     if (currentCashier?.id === id) {
       const remaining = cashiers.filter((c) => c.id !== id);
       setCurrentCashier(remaining[0] || null);
@@ -870,8 +877,19 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     setProducts(updatedProducts);
-    setStockMovements((prev) => [...newStockMovements, ...prev]);
-    setTransactions((prev) => [newTrx, ...prev]);
+    setStockMovements((prev) => {
+      const nextMovements = [...newStockMovements, ...prev];
+      setTransactions((prevTrx) => {
+        const nextTrx = [newTrx, ...prevTrx];
+        saveToServer({
+          products: updatedProducts,
+          stockMovements: nextMovements,
+          transactions: nextTrx,
+        });
+        return nextTrx;
+      });
+      return nextMovements;
+    });
     setLatestTransaction(newTrx);
     clearCart();
 
@@ -922,8 +940,19 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 3. Update states
     setProducts(updatedProducts);
-    setStockMovements((prev) => [...stockReversals, ...prev]);
-    setTransactions((prev) => prev.filter((t) => t.id !== trxId));
+    setStockMovements((prev) => {
+      const nextMovements = [...stockReversals, ...prev];
+      setTransactions((prevTrx) => {
+        const nextTrx = prevTrx.filter((t) => t.id !== trxId);
+        saveToServer({
+          products: updatedProducts,
+          stockMovements: nextMovements,
+          transactions: nextTrx,
+        });
+        return nextTrx;
+      });
+      return nextMovements;
+    });
 
     if (latestTransaction?.id === trxId) {
       setLatestTransaction(null);
@@ -960,18 +989,24 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       operator: currentUserName,
     };
 
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === productId
-          ? {
-              ...p,
-              stock: newStock,
-              costPrice: costPrice !== undefined ? costPrice : p.costPrice,
-            }
-          : p
-      )
+    const nextProducts = products.map((p) =>
+      p.id === productId
+        ? {
+            ...p,
+            stock: newStock,
+            costPrice: costPrice !== undefined ? costPrice : p.costPrice,
+          }
+        : p
     );
-    setStockMovements((prev) => [movement, ...prev]);
+    setProducts(nextProducts);
+    setStockMovements((prev) => {
+      const nextMovements = [movement, ...prev];
+      saveToServer({
+        products: nextProducts,
+        stockMovements: nextMovements,
+      });
+      return nextMovements;
+    });
   };
 
   // Stock Out (Barang Keluar non-penjualan)
@@ -1001,10 +1036,16 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       operator: currentUserName,
     };
 
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p))
-    );
-    setStockMovements((prev) => [movement, ...prev]);
+    const nextProducts = products.map((p) => (p.id === productId ? { ...p, stock: newStock } : p));
+    setProducts(nextProducts);
+    setStockMovements((prev) => {
+      const nextMovements = [movement, ...prev];
+      saveToServer({
+        products: nextProducts,
+        stockMovements: nextMovements,
+      });
+      return nextMovements;
+    });
   };
 
   // Product CRUD
@@ -1037,6 +1078,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
     localStorage.setItem('kasirku_movements', JSON.stringify(nextMovements));
+    
+    // Explicitly save to server immediately!
+    saveToServer({
+      products: nextProducts,
+      stockMovements: nextMovements,
+    });
   };
 
   const updateProduct = (updated: Product) => {
@@ -1044,6 +1091,11 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextProducts = products.map((p) => (p.id === updated.id ? updated : p));
     setProducts(nextProducts);
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
+    
+    // Explicitly save to server immediately!
+    saveToServer({
+      products: nextProducts,
+    });
   };
 
   const deleteProduct = (productId: string) => {
@@ -1052,11 +1104,20 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProducts(nextProducts);
     removeFromCart(productId);
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
+    
+    // Explicitly save to server immediately!
+    saveToServer({
+      products: nextProducts,
+    });
   };
 
   // Settings
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const next = { ...prev, ...newSettings };
+      saveToServer({ settings: next });
+      return next;
+    });
   };
 
   const resetAllData = () => {
@@ -1071,6 +1132,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(false);
     localStorage.clear();
     sessionStorage.clear();
+
+    saveToServer({
+      settings: INITIAL_SETTINGS,
+      products: INITIAL_PRODUCTS,
+      stockMovements: INITIAL_STOCK_MOVEMENTS,
+      transactions: INITIAL_TRANSACTIONS,
+      cashiers: INITIAL_CASHIERS,
+    });
   };
 
   return (
