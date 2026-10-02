@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, AlertCircle } from 'lucide-react';
+import { X, Camera, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface LiveCameraScannerModalProps {
@@ -15,10 +15,70 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
   onScanSuccess,
   title = 'Scan Barcode via Kamera',
 }) => {
+  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const elementId = 'html5-qrcode-reader-live-container';
+
+  const requestCameraAndStart = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+      } catch (e) {}
+      scannerRef.current = null;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+      stream.getTracks().forEach((t) => t.stop());
+
+      setPermissionGranted(true);
+      setIsLoading(false);
+
+      setTimeout(async () => {
+        try {
+          const html5QrCode = new Html5Qrcode(elementId);
+          scannerRef.current = html5QrCode;
+
+          await html5QrCode.start(
+            { facingMode: 'environment' },
+            {
+              fps: 15,
+              qrbox: { width: 250, height: 160 },
+            },
+            (decodedText) => {
+              html5QrCode
+                .stop()
+                .catch(() => {})
+                .finally(() => {
+                  scannerRef.current = null;
+                  setPermissionGranted(false);
+                  onScanSuccess(decodedText);
+                  onClose();
+                });
+            },
+            () => {}
+          );
+        } catch (err: any) {
+          console.error('Start error:', err);
+          setErrorMsg('Gagal mengaktifkan pemindai kamera live.');
+        }
+      }, 300);
+    } catch (err: any) {
+      console.error('Permission error:', err);
+      setIsLoading(false);
+      setPermissionGranted(false);
+      setErrorMsg(
+        'Akses kamera ditolak atau dibatasi. Mohon klik tombol di bawah untuk memberikan izin akses kamera.'
+      );
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -30,73 +90,15 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
             scannerRef.current = null;
           });
       }
+      setPermissionGranted(false);
       setErrorMsg('');
-      setIsLoading(true);
+      setIsLoading(false);
       return;
     }
 
-    let isMounted = true;
-    setIsLoading(true);
-    setErrorMsg('');
-
-    const startLiveScanner = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        });
-        stream.getTracks().forEach((t) => t.stop());
-
-        if (!isMounted) return;
-
-        setTimeout(async () => {
-          if (!isMounted) return;
-          try {
-            const html5QrCode = new Html5Qrcode(elementId);
-            scannerRef.current = html5QrCode;
-
-            await html5QrCode.start(
-              { facingMode: 'environment' },
-              {
-                fps: 15,
-                qrbox: { width: 250, height: 160 },
-              },
-              (decodedText) => {
-                if (!isMounted) return;
-                html5QrCode
-                  .stop()
-                  .catch(() => {})
-                  .finally(() => {
-                    scannerRef.current = null;
-                    onScanSuccess(decodedText);
-                    onClose();
-                  });
-              },
-              () => {}
-            );
-            setIsLoading(false);
-          } catch (startErr: any) {
-            console.error('Html5Qrcode start error:', startErr);
-            if (isMounted) {
-              setErrorMsg('Gagal memulai pemindai live kamera. Pastikan izin kamera aktif.');
-              setIsLoading(false);
-            }
-          }
-        }, 300);
-      } catch (err: any) {
-        console.error('getUserMedia error:', err);
-        if (isMounted) {
-          setErrorMsg(
-            'Akses kamera diblokir atau belum diizinkan oleh browser. Mohon berikan izin akses kamera.'
-          );
-          setIsLoading(false);
-        }
-      }
-    };
-
-    startLiveScanner();
+    requestCameraAndStart();
 
     return () => {
-      isMounted = false;
       if (scannerRef.current) {
         scannerRef.current
           .stop()
@@ -106,7 +108,7 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           });
       }
     };
-  }, [isOpen, onScanSuccess, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -126,9 +128,11 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
                   .catch(() => {})
                   .finally(() => {
                     scannerRef.current = null;
+                    setPermissionGranted(false);
                     onClose();
                   });
               } else {
+                setPermissionGranted(false);
                 onClose();
               }
             }}
@@ -138,54 +142,57 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </button>
         </div>
 
-        {errorMsg ? (
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-3 text-left">
-            <div className="flex items-center gap-2 font-semibold">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Izin Kamera Diperlukan</span>
+        {/* Permission Request Prompt Banner / Overlay */}
+        {(!permissionGranted || errorMsg) && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 text-left">
+            <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>Izin Akses Kamera Diperlukan</span>
             </div>
-            <p className="text-[11px] leading-relaxed">{errorMsg}</p>
-            
-            <div className="pt-2 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.reload();
-                }}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Muat Ulang Halaman untuk Izin Kamera
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const simulated = `899${Math.floor(100000000 + Math.random() * 900000000)}`;
-                  onScanSuccess(simulated);
-                  onClose();
-                }}
-                className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Gunakan Barcode Otomatis (Simulasi)
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="relative rounded-xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[240px] flex items-center justify-center">
-              <div id={elementId} className="w-full" />
-              {isLoading && (
-                <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs">
-                  <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                  <span>Mengaktifkan kamera live...</span>
-                </div>
-              )}
-            </div>
-            <p className="text-[11px] text-neutral-500">
-              Arahkan kamera ke barcode produk. Barcode akan terbaca secara <strong>otomatis</strong>.
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              {errorMsg || 'Aplikasi membutuhkan izin kamera Anda untuk memindai barcode produk secara otomatis secara real-time.'}
             </p>
+            <button
+              type="button"
+              onClick={requestCameraAndStart}
+              disabled={isLoading}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Camera className="w-4 h-4" />
+              <span>{isLoading ? 'Meminta Izin Kamera...' : 'Izinkan & Aktifkan Kamera Sekarang'}</span>
+            </button>
           </div>
         )}
+
+        {/* Live Camera View */}
+        <div className={`space-y-3 ${!permissionGranted ? 'hidden' : 'block'}`}>
+          <div className="relative rounded-xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[240px] flex items-center justify-center">
+            <div id={elementId} className="w-full" />
+            {isLoading && (
+              <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                <span>Menyiapkan kamera live...</span>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-neutral-500">
+            Arahkan kamera ke barcode produk. Barcode akan terbaca secara <strong>otomatis</strong>.
+          </p>
+        </div>
+
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              const simulated = `899${Math.floor(100000000 + Math.random() * 900000000)}`;
+              onScanSuccess(simulated);
+              onClose();
+            }}
+            className="text-[11px] text-neutral-500 hover:text-neutral-900 underline font-medium cursor-pointer"
+          >
+            Atau gunakan Barcode Otomatis (Simulasi)
+          </button>
+        </div>
       </div>
     </div>
   );

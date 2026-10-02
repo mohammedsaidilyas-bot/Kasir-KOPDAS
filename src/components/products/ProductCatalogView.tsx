@@ -148,7 +148,7 @@ export const ProductCatalogView: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold text-neutral-900 tracking-tight">Katalog Data Produk</h1>
           <p className="text-xs text-neutral-500 mt-0.5">
-            Daftar harga modal, harga jual eceran, dan ketentuan harga grosir toko.
+            Daftar harga modal, harga jual eceran, dan ketentuan harga grosir toko. (Dapat diakses oleh Pengelola & Admin)
           </p>
         </div>
 
