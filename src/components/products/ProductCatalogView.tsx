@@ -27,6 +27,7 @@ export const ProductCatalogView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isCameraScanOpen, setIsCameraScanOpen] = useState(false);
+  const [isBoxCameraScanOpen, setIsBoxCameraScanOpen] = useState(false);
   const [isCatalogScanOpen, setIsCatalogScanOpen] = useState(false);
 
   // Form inputs
@@ -379,17 +380,28 @@ export const ProductCatalogView: React.FC = () => {
                       <Scan className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
                       <span>Barcode Perkanton / Dus:</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const randomBoxSku = `BOX899${Math.floor(10000000 + Math.random() * 90000000)}`;
-                        setFormData({ ...formData, boxSku: randomBoxSku });
-                      }}
-                      className="text-[10px] text-neutral-500 hover:text-neutral-900 font-semibold cursor-pointer"
-                      title="Generate barcode dus baru"
-                    >
-                      + Gen Acak
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsBoxCameraScanOpen(true)}
+                        className="text-[10px] bg-blue-50 text-blue-700 hover:bg-blue-100 px-2 py-0.5 rounded font-bold border border-blue-200 inline-flex items-center gap-1 cursor-pointer"
+                        title="Scan barcode dus menggunakan kamera perangkat"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Scan Kamera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const randomBoxSku = `BOX899${Math.floor(10000000 + Math.random() * 90000000)}`;
+                          setFormData({ ...formData, boxSku: randomBoxSku });
+                        }}
+                        className="text-[10px] text-neutral-500 hover:text-neutral-900 font-semibold cursor-pointer"
+                        title="Generate barcode dus baru"
+                      >
+                        + Gen Acak
+                      </button>
+                    </div>
                   </label>
                   <input
                     type="text"
@@ -700,6 +712,13 @@ export const ProductCatalogView: React.FC = () => {
         onClose={() => setIsCameraScanOpen(false)}
         onScanSuccess={(code) => setFormData((prev) => ({ ...prev, sku: code }))}
         title="Scan Barcode Produk via Kamera"
+      />
+
+      <LiveCameraScannerModal
+        isOpen={isBoxCameraScanOpen}
+        onClose={() => setIsBoxCameraScanOpen(false)}
+        onScanSuccess={(code) => setFormData((prev) => ({ ...prev, boxSku: code }))}
+        title="Scan Barcode Perkanton/Dus via Kamera"
       />
 
       <LiveCameraScannerModal
