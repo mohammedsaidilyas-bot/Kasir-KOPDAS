@@ -27,6 +27,7 @@ export const ProductCatalogView: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isCameraScanOpen, setIsCameraScanOpen] = useState(false);
+  const [isCatalogScanOpen, setIsCatalogScanOpen] = useState(false);
 
   // Form inputs
   const [formData, setFormData] = useState({
@@ -171,9 +172,19 @@ export const ProductCatalogView: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari produk / barcode..."
-              className="pl-8 pr-3 py-1.5 border border-neutral-200 rounded-lg text-xs w-56 focus:outline-none focus:ring-1 focus:ring-neutral-900"
+              className="pl-8 pr-3 py-1.5 border border-neutral-200 rounded-lg text-xs w-52 sm:w-64 focus:outline-none focus:ring-1 focus:ring-neutral-900"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCatalogScanOpen(true)}
+            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Scan barcode produk untuk mencari dengan cepat"
+          >
+            <Camera className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Scan Cari</span>
+          </button>
 
           <select
             value={selectedCat}
@@ -659,6 +670,13 @@ export const ProductCatalogView: React.FC = () => {
         onClose={() => setIsCameraScanOpen(false)}
         onScanSuccess={(code) => setFormData((prev) => ({ ...prev, sku: code }))}
         title="Scan Barcode Produk via Kamera"
+      />
+
+      <LiveCameraScannerModal
+        isOpen={isCatalogScanOpen}
+        onClose={() => setIsCatalogScanOpen(false)}
+        onScanSuccess={(code) => setSearch(code)}
+        title="Scan Barcode untuk Cari Produk"
       />
     </div>
   );
