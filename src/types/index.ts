@@ -6,7 +6,8 @@ export type PaymentMethod = 'tunai' | 'qris' | 'transfer' | 'debit';
 
 export interface Product {
   id: string;
-  sku: string;
+  sku: string; // Barcode Eceran / Satuan
+  boxSku?: string; // Barcode Perkanton / Dus / Karton
   name: string;
   category: string;
   unit: string; // 'pcs' | 'bks' | 'botol' | 'kg' | 'sachet' | 'pouch'

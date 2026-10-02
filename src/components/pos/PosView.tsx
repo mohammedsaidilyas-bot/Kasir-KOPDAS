@@ -80,18 +80,29 @@ export const PosView: React.FC = () => {
   // Barcode quick add
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!barcodeInput.trim()) return;
+    const cleanInput = barcodeInput.trim().toLowerCase();
+    if (!cleanInput) return;
 
-    const found = products.find(
-      (p) => p.sku.toLowerCase() === barcodeInput.trim().toLowerCase()
+    const foundBox = products.find(
+      (p) => p.boxSku && p.boxSku.toLowerCase() === cleanInput
+    );
+    const foundEcer = products.find(
+      (p) => p.sku.toLowerCase() === cleanInput
     );
 
-    if (found) {
-      if (found.stock > 0) {
-        addToCart(found);
+    if (foundBox) {
+      if (foundBox.stock >= (foundBox.boxQty || 1)) {
+        addToCart(foundBox, 'dus', 1);
         setBarcodeInput('');
       } else {
-        alert(`Stok produk "${found.name}" habis!`);
+        alert(`Stok produk "${foundBox.name}" tidak mencukupi untuk 1 ${foundBox.boxUnit || 'dus'}!`);
+      }
+    } else if (foundEcer) {
+      if (foundEcer.stock > 0) {
+        addToCart(foundEcer, 'ecer', 1);
+        setBarcodeInput('');
+      } else {
+        alert(`Stok produk "${foundEcer.name}" habis!`);
       }
     } else {
       alert(`Produk dengan barcode/SKU "${barcodeInput}" tidak ditemukan.`);
@@ -100,15 +111,24 @@ export const PosView: React.FC = () => {
 
   const handleScanSuccess = (decodedText: string) => {
     const clean = decodedText.trim().toLowerCase();
-    const found = products.find(
+    const foundBox = products.find(
+      (p) => p.boxSku && p.boxSku.toLowerCase() === clean
+    );
+    const foundEcer = products.find(
       (p) => p.sku.toLowerCase() === clean || p.id === clean || p.name.toLowerCase().includes(clean)
     );
 
-    if (found) {
-      if (found.stock > 0) {
-        addToCart(found);
+    if (foundBox) {
+      if (foundBox.stock >= (foundBox.boxQty || 1)) {
+        addToCart(foundBox, 'dus', 1);
       } else {
-        alert(`Stok produk "${found.name}" habis!`);
+        alert(`Stok produk "${foundBox.name}" tidak mencukupi untuk 1 ${foundBox.boxUnit || 'dus'}!`);
+      }
+    } else if (foundEcer) {
+      if (foundEcer.stock > 0) {
+        addToCart(foundEcer, 'ecer', 1);
+      } else {
+        alert(`Stok produk "${foundEcer.name}" habis!`);
       }
     } else {
       setBarcodeInput(decodedText);

@@ -42,6 +42,15 @@ export const StockManagementView: React.FC = () => {
   const [inNotes, setInNotes] = useState<string>('');
   const [inSuccessMsg, setInSuccessMsg] = useState<string>('');
 
+  // Carton Restock states (Perkanton)
+  const [restockType, setRestockType] = useState<'ecer' | 'karton'>('ecer');
+  const [scanBarcodeCarton, setScanBarcodeCarton] = useState('');
+  const [isCameraScanCartonOpen, setIsCameraScanCartonOpen] = useState(false);
+  const [inCartonQty, setInCartonQty] = useState<number>(1);
+  const [inBoxCostPrice, setInBoxCostPrice] = useState<number>(
+    products[0]?.boxCostPrice || (products[0]?.costPrice || 0) * (products[0]?.boxQty || 1)
+  );
+
   // Form Stock Out states
   const [outProductId, setOutProductId] = useState<string>(products[0]?.id || '');
   const [outQty, setOutQty] = useState<number>(1);
@@ -65,14 +74,47 @@ export const StockManagementView: React.FC = () => {
     }
   };
 
+  const handleCartonProductChange = (prodId: string) => {
+    setInProductId(prodId);
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      setInBoxCostPrice(prod.boxCostPrice || prod.costPrice * (prod.boxQty || 1));
+    }
+  };
+
   const handleStockInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inProductId || inQty <= 0) return;
 
     recordStockIn(inProductId, inQty, inCostPrice, inSupplier, inNotes);
     const prod = products.find((p) => p.id === inProductId);
-    setInSuccessMsg(`Berhasil menambahkan ${inQty} ${prod?.unit || 'unit'} untuk "${prod?.name}"!`);
+    setInSuccessMsg(`Berhasil menambahkan ${inQty} ${prod?.unit || 'unit'} ecer untuk "${prod?.name}"!`);
     setInQty(10);
+    setInNotes('');
+    setInSupplier('');
+    setTimeout(() => setInSuccessMsg(''), 4000);
+  };
+
+  const handleStockCartonSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inProductId || inCartonQty <= 0) return;
+    const prod = products.find((p) => p.id === inProductId);
+    if (!prod) return;
+
+    const boxSize = prod.boxQty || 1;
+    const totalUnitsAdded = inCartonQty * boxSize;
+    const unitCost = inBoxCostPrice / boxSize;
+
+    recordStockIn(
+      inProductId,
+      totalUnitsAdded,
+      unitCost,
+      inSupplier,
+      `Restock Perkanton: ${inCartonQty} ${prod.boxUnit || 'dus'} (Total +${totalUnitsAdded} ${prod.unit}) - ${inNotes}`
+    );
+
+    setInSuccessMsg(`Berhasil restock perkanton: ${inCartonQty} ${prod.boxUnit || 'dus'} (${totalUnitsAdded} ${prod.unit}) untuk "${prod.name}"!`);
+    setInCartonQty(1);
     setInNotes('');
     setInSupplier('');
     setTimeout(() => setInSuccessMsg(''), 4000);
@@ -194,193 +236,471 @@ export const StockManagementView: React.FC = () => {
 
       {/* Tab 1: Input Barang Masuk */}
       {activeSubTab === 'masuk' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-7 bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-neutral-100">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <ArrowDownLeft className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-neutral-900">
-                  Formulir Barang Masuk (Restock / Pembelian)
-                </h2>
-                <p className="text-xs text-neutral-500">
-                  Tambah stok barang yang baru diterima dari pemasok atau distributor
-                </p>
-              </div>
-            </div>
-
-            {inSuccessMsg && (
-              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{inSuccessMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleStockInSubmit} className="space-y-4">
-              <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold text-neutral-700 flex items-center gap-1.5">
-                    <Barcode className="w-3.5 h-3.5 text-neutral-600" />
-                    <span>Scan Barcode / SKU Cepat:</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsCameraScanInOpen(true)}
-                    className="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded font-bold border border-emerald-200 inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <Camera className="w-3 h-3" />
-                    <span>Scan Kamera</span>
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={scanBarcodeIn}
-                    onChange={(e) => setScanBarcodeIn(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const found = products.find(
-                          (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
-                        );
-                        if (found) {
-                          handleInProductChange(found.id);
-                          setScanBarcodeIn('');
-                          setInSuccessMsg(`Produk "${found.name}" terpilih via scan!`);
-                          setTimeout(() => setInSuccessMsg(''), 3000);
-                        } else {
-                          alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
-                        }
-                      }
-                    }}
-                    placeholder="Scan atau ketik barcode lalu Enter..."
-                    className="flex-1 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-mono focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const found = products.find(
-                        (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
-                      );
-                      if (found) {
-                        handleInProductChange(found.id);
-                        setScanBarcodeIn('');
-                        setInSuccessMsg(`Produk "${found.name}" terpilih via scan!`);
-                        setTimeout(() => setInSuccessMsg(''), 3000);
-                      } else {
-                        alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
-                  >
-                    Cari
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                  Pilih Produk:
-                </label>
-                <select
-                  value={inProductId}
-                  onChange={(e) => handleInProductChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                >
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Stok Saat Ini: {p.stock} {p.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Jumlah Masuk:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={inQty}
-                    onChange={(e) => setInQty(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Harga Beli / Modal Satuan (Rp):
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={inCostPrice}
-                    onChange={(e) => setInCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Nama Supplier / Distributor:
-                  </label>
-                  <input
-                    type="text"
-                    value={inSupplier}
-                    onChange={(e) => setInSupplier(e.target.value)}
-                    placeholder="Contoh: PT Beras Nusantara"
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
-                    Catatan / Nomor Faktur:
-                  </label>
-                  <input
-                    type="text"
-                    value={inNotes}
-                    onChange={(e) => setInNotes(e.target.value)}
-                    placeholder="Contoh: PO-8921 / Kiriman Sore"
-                    className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
+        <div className="space-y-4">
+          {/* Restock Mode Toggle: Ecer vs Perkanton */}
+          <div className="flex items-center justify-between bg-white p-3 border border-neutral-200 rounded-2xl shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-neutral-700">Metode Restock Masuk:</span>
+              <div className="flex p-0.5 bg-neutral-100 rounded-xl border border-neutral-200 text-xs font-semibold">
                 <button
-                  type="submit"
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={() => setRestockType('ecer')}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    restockType === 'ecer'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Simpan Barang Masuk</span>
+                  <span>🛍️ Scan & Restock Ecer (Satuan)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRestockType('karton')}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    restockType === 'karton'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  <span>📦 Scan & Restock Perkanton (Dus)</span>
                 </button>
               </div>
-            </form>
+            </div>
           </div>
 
-          {/* Quick Info Sidecard */}
-          <div className="lg:col-span-5 bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-3">
-            <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
-              Panduan Barang Masuk
-            </h3>
-            <ul className="text-xs text-neutral-600 space-y-2 list-disc list-inside">
-              <li>
-                Stok produk akan <strong>otomatis bertambah</strong> begitu disimpan.
-              </li>
-              <li>
-                Harga modal (HPP) produk di sistem akan disesuaikan dengan nilai terbaru yang Anda masukkan.
-              </li>
-              <li>
-                Setiap mutasi masuk dicatat dalam audit log permanen lengkap dengan nama operator, tanggal, dan faktur.
-              </li>
-            </ul>
-          </div>
+          {restockType === 'ecer' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-7 bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-neutral-100">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <ArrowDownLeft className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-neutral-900">
+                      Formulir Barang Masuk Ecer (Satuan / Pcs)
+                    </h2>
+                    <p className="text-xs text-neutral-500">
+                      Scan barcode ecer untuk menambah stok satuan/pcs dari supplier
+                    </p>
+                  </div>
+                </div>
+
+                {inSuccessMsg && (
+                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{inSuccessMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleStockInSubmit} className="space-y-4">
+                  <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-emerald-900 flex items-center gap-1.5">
+                        <Barcode className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Scan Barcode Ecer / Satuan:</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCameraScanInOpen(true)}
+                        className="text-[10px] bg-emerald-600 text-white hover:bg-emerald-700 px-2 py-1 rounded font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Scan Kamera Ecer</span>
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={scanBarcodeIn}
+                        onChange={(e) => setScanBarcodeIn(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const found = products.find(
+                              (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
+                            );
+                            if (found) {
+                              handleInProductChange(found.id);
+                              setScanBarcodeIn('');
+                              setInSuccessMsg(`Produk "${found.name}" terpilih via scan ecer!`);
+                              setTimeout(() => setInSuccessMsg(''), 3000);
+                            } else {
+                              alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
+                            }
+                          }
+                        }}
+                        placeholder="Scan atau ketik barcode ecer lalu Enter..."
+                        className="flex-1 px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-mono focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const found = products.find(
+                            (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
+                          );
+                          if (found) {
+                            handleInProductChange(found.id);
+                            setScanBarcodeIn('');
+                            setInSuccessMsg(`Produk "${found.name}" terpilih via scan ecer!`);
+                            setTimeout(() => setInSuccessMsg(''), 3000);
+                          } else {
+                            alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        Cari
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      Pilih Produk:
+                    </label>
+                    <select
+                      value={inProductId}
+                      onChange={(e) => handleInProductChange(e.target.value)}
+                      className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    >
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} (Stok: {p.stock} {p.unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Jumlah Masuk (Satuan / Pcs):
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={inQty}
+                        onChange={(e) => setInQty(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Harga Beli / Modal Satuan (Rp):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={inCostPrice}
+                        onChange={(e) => setInCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Nama Supplier / Distributor:
+                      </label>
+                      <input
+                        type="text"
+                        value={inSupplier}
+                        onChange={(e) => setInSupplier(e.target.value)}
+                        placeholder="Contoh: PT Beras Nusantara"
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Catatan / Nomor Faktur:
+                      </label>
+                      <input
+                        type="text"
+                        value={inNotes}
+                        onChange={(e) => setInNotes(e.target.value)}
+                        placeholder="Contoh: Faktur Ecer-001"
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Simpan Barang Masuk Ecer</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="lg:col-span-5 bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-3">
+                <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                  Panduan Scan Ecer
+                </h3>
+                <ul className="text-xs text-neutral-600 space-y-2 list-disc list-inside">
+                  <li>Gunakan mode ini untuk penambahan stok per satuan pcs / unit eceran.</li>
+                  <li>Scan barcode produk ecer langsung untuk memilih produk secara instan.</li>
+                  <li>Stok akan bertambah persis sejumlah satuan yang diinput.</li>
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-7 bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-neutral-100">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-neutral-900">
+                      Formulir Restock Perkanton (Dus / Karton / Box)
+                    </h2>
+                    <p className="text-xs text-neutral-500">
+                      Scan barcode karton/dus untuk menambah stok dalam jumlah besar (otomatis dikali isi per dus)
+                    </p>
+                  </div>
+                </div>
+
+                {inSuccessMsg && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs font-semibold text-blue-800 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>{inSuccessMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleStockCartonSubmit} className="space-y-4">
+                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+                        <Barcode className="w-3.5 h-3.5 text-blue-700" />
+                        <span>Scan Barcode Khusus Karton / Dus:</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCameraScanCartonOpen(true)}
+                        className="text-[10px] bg-blue-600 text-white hover:bg-blue-700 px-2 py-1 rounded font-bold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Scan Kamera Karton</span>
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={scanBarcodeCarton}
+                        onChange={(e) => setScanBarcodeCarton(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const cleanCode = scanBarcodeCarton.trim().toLowerCase();
+                            const found = products.find(
+                              (p) => (p.boxSku && p.boxSku.toLowerCase() === cleanCode) || p.sku.toLowerCase() === cleanCode
+                            );
+                            if (found) {
+                              handleCartonProductChange(found.id);
+                              setScanBarcodeCarton('');
+                              setInSuccessMsg(`Produk "${found.name}" terpilih via scan karton!`);
+                              setTimeout(() => setInSuccessMsg(''), 3000);
+                            } else {
+                              alert(`Produk dengan barcode karton "${scanBarcodeCarton}" tidak ditemukan.`);
+                            }
+                          }
+                        }}
+                        placeholder="Scan atau ketik barcode karton lalu Enter..."
+                        className="flex-1 px-3 py-2 bg-white border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cleanCode = scanBarcodeCarton.trim().toLowerCase();
+                          const found = products.find(
+                            (p) => (p.boxSku && p.boxSku.toLowerCase() === cleanCode) || p.sku.toLowerCase() === cleanCode
+                          );
+                          if (found) {
+                            handleCartonProductChange(found.id);
+                            setScanBarcodeCarton('');
+                            setInSuccessMsg(`Produk "${found.name}" terpilih via scan karton!`);
+                            setTimeout(() => setInSuccessMsg(''), 3000);
+                          } else {
+                            alert(`Produk dengan barcode karton "${scanBarcodeCarton}" tidak ditemukan.`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        Cari
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      Pilih Produk (Perkanton):
+                    </label>
+                    <select
+                      value={inProductId}
+                      onChange={(e) => handleCartonProductChange(e.target.value)}
+                      className="w-full px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                    >
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — (Isi per {p.boxUnit || 'dus'}: {p.boxQty || 1} {p.unit}, Stok: {p.stock} {p.unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {(() => {
+                    const selProd = products.find((p) => p.id === inProductId);
+                    const boxSize = selProd?.boxQty || 1;
+                    const totalPcs = inCartonQty * boxSize;
+
+                    return (
+                      <div className="bg-neutral-50 p-3 rounded-xl border border-neutral-200 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                              Jumlah Karton / Dus Masuk:
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={inCartonQty}
+                              onChange={(e) => setInCartonQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900 bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                              Harga Beli / Modal Per {selProd?.boxUnit || 'Dus'} (Rp):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={inBoxCostPrice}
+                              onChange={(e) => setInBoxCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-neutral-900 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-neutral-600 bg-blue-50/60 p-2.5 rounded-lg border border-blue-200 flex flex-col gap-0.5">
+                          <div>📌 <strong>Konversi Perkanton:</strong> {inCartonQty} {selProd?.boxUnit || 'dus'} × {boxSize} {selProd?.unit || 'pcs'} = <strong className="text-blue-800">+{totalPcs} {selProd?.unit || 'pcs'}</strong> total penambahan stok.</div>
+                          <div>💰 Estimasi Modal Per Pcs: <strong className="text-neutral-900">{formatRupiah(inBoxCostPrice / boxSize)}</strong></div>
+                        </div>
+
+                        {/* Bottom Quick Barcode Scanner for Carton */}
+                        <div className="bg-blue-100/60 p-2.5 rounded-xl border border-blue-300 space-y-1.5">
+                          <label className="block text-[11px] font-bold text-blue-900 flex items-center gap-1.5">
+                            <Barcode className="w-3.5 h-3.5 text-blue-700" />
+                            <span>Scan Cepat Bawah (Auto +1 Karton):</span>
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Scan barcode untuk tambah 1 dus lagi..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const code = (e.target as HTMLInputElement).value.trim();
+                                  const found = products.find((p) => p.sku.toLowerCase() === code.toLowerCase());
+                                  if (found) {
+                                    handleCartonProductChange(found.id);
+                                    setInCartonQty((prev) => prev + 1);
+                                    (e.target as HTMLInputElement).value = '';
+                                    setInSuccessMsg(`📦 +1 ${found.boxUnit || 'dus'} "${found.name}" ditambahkan!`);
+                                    setTimeout(() => setInSuccessMsg(''), 3000);
+                                  } else {
+                                    alert(`Produk dengan barcode "${code}" tidak ditemukan.`);
+                                  }
+                                }
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                const inputEl = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                                const code = inputEl?.value.trim() || '';
+                                const found = products.find((p) => p.sku.toLowerCase() === code.toLowerCase());
+                                if (found) {
+                                  handleCartonProductChange(found.id);
+                                  setInCartonQty((prev) => prev + 1);
+                                  inputEl.value = '';
+                                  setInSuccessMsg(`📦 +1 ${found.boxUnit || 'dus'} "${found.name}" ditambahkan!`);
+                                  setTimeout(() => setInSuccessMsg(''), 3000);
+                                } else {
+                                  alert(`Produk dengan barcode "${code}" tidak ditemukan.`);
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                            >
+                              +1 Dus
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Nama Supplier / Distributor:
+                      </label>
+                      <input
+                        type="text"
+                        value={inSupplier}
+                        onChange={(e) => setInSupplier(e.target.value)}
+                        placeholder="Contoh: PT Distributor Utama"
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        Catatan / Nomor Faktur:
+                      </label>
+                      <input
+                        type="text"
+                        value={inNotes}
+                        onChange={(e) => setInNotes(e.target.value)}
+                        placeholder="Contoh: Faktur Karton-99"
+                        className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Package className="w-4 h-4" />
+                      <span>Simpan Restock Perkanton (Dus)</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="lg:col-span-5 bg-neutral-50 border border-neutral-200 rounded-2xl p-5 space-y-3">
+                <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                  Panduan Scan Perkanton
+                </h3>
+                <ul className="text-xs text-neutral-600 space-y-2 list-disc list-inside">
+                  <li>Gunakan mode ini khusus untuk pembelian/restock dalam kemasan dus/karton/box.</li>
+                  <li>Sistem secara otomatis mengalikan jumlah dus dengan isi per dus ({products.find(p => p.id === inProductId)?.boxQty || 1} pcs) ke dalam stok satuan.</li>
+                  <li>Terdapat pembedaan yang jelas antara Scan Ecer dan Scan Karton untuk mencegah kesalahan input.</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -774,13 +1094,29 @@ export const StockManagementView: React.FC = () => {
           const found = products.find((p) => p.sku.toLowerCase() === code.trim().toLowerCase());
           if (found) {
             handleInProductChange(found.id);
-            setInSuccessMsg(`Produk "${found.name}" terpilih via kamera!`);
+            setInSuccessMsg(`Produk "${found.name}" terpilih via kamera ecer!`);
             setTimeout(() => setInSuccessMsg(''), 3000);
           } else {
             alert(`Produk dengan barcode "${code}" tidak ditemukan di inventaris.`);
           }
         }}
-        title="Scan Barcode Barang Masuk"
+        title="Scan Barcode Barang Masuk Ecer"
+      />
+
+      <LiveCameraScannerModal
+        isOpen={isCameraScanCartonOpen}
+        onClose={() => setIsCameraScanCartonOpen(false)}
+        onScanSuccess={(code) => {
+          const found = products.find((p) => p.sku.toLowerCase() === code.trim().toLowerCase());
+          if (found) {
+            handleCartonProductChange(found.id);
+            setInSuccessMsg(`Produk "${found.name}" terpilih via kamera karton!`);
+            setTimeout(() => setInSuccessMsg(''), 3000);
+          } else {
+            alert(`Produk dengan barcode karton "${code}" tidak ditemukan di inventaris.`);
+          }
+        }}
+        title="Scan Barcode Karton / Dus"
       />
 
       <LiveCameraScannerModal
