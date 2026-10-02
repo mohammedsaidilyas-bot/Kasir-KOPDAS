@@ -239,14 +239,43 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // 1. Initial Load & Real-time Listeners from Firestore
   useEffect(() => {
     // 1. Settings Listener
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), (snapshot) => {
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), async (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as StoreSettings;
         setSettings(data);
         localStorage.setItem('kasirku_settings', JSON.stringify(data));
       } else {
-        // Seed initial settings if empty
-        setDoc(doc(db, 'settings', 'config'), INITIAL_SETTINGS);
+        // Very first boot of the entire app: Seed everything!
+        try {
+          const batch = writeBatch(db);
+          
+          // Seed settings
+          batch.set(doc(db, 'settings', 'config'), INITIAL_SETTINGS);
+
+          // Seed products
+          INITIAL_PRODUCTS.forEach((p) => {
+            batch.set(doc(db, 'products', p.id), p);
+          });
+
+          // Seed stock movements
+          INITIAL_STOCK_MOVEMENTS.forEach((m) => {
+            batch.set(doc(db, 'stockMovements', m.id), m);
+          });
+
+          // Seed transactions
+          INITIAL_TRANSACTIONS.forEach((t) => {
+            batch.set(doc(db, 'transactions', t.id), t);
+          });
+
+          // Seed cashiers
+          INITIAL_CASHIERS.forEach((c) => {
+            batch.set(doc(db, 'cashiers', c.id), c);
+          });
+
+          await batch.commit();
+        } catch (e) {
+          console.error("Failed to seed initial database:", e);
+        }
       }
     }, (err) => console.error("Firestore settings error:", err));
 
@@ -256,17 +285,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       snapshot.forEach((doc) => {
         items.push(doc.data() as Product);
       });
-      if (items.length > 0) {
-        setProducts(items);
-        localStorage.setItem('kasirku_products', JSON.stringify(items));
-      } else {
-        // Seed initial products if database is fresh
-        const batch = writeBatch(db);
-        INITIAL_PRODUCTS.forEach((p) => {
-          batch.set(doc(db, 'products', p.id), p);
-        });
-        batch.commit().catch(e => console.error("Failed to seed products:", e));
-      }
+      setProducts(items);
+      localStorage.setItem('kasirku_products', JSON.stringify(items));
     }, (err) => console.error("Firestore products error:", err));
 
     // 3. Stock Movements Listener
@@ -278,15 +298,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setStockMovements(items);
       localStorage.setItem('kasirku_movements', JSON.stringify(items));
-
-      if (items.length === 0) {
-        // Seed initial stock movements
-        const batch = writeBatch(db);
-        INITIAL_STOCK_MOVEMENTS.forEach((m) => {
-          batch.set(doc(db, 'stockMovements', m.id), m);
-        });
-        batch.commit().catch(e => console.error("Failed to seed movements:", e));
-      }
     }, (err) => console.error("Firestore movements error:", err));
 
     // 4. Transactions Listener
@@ -298,15 +309,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       setTransactions(items);
       localStorage.setItem('kasirku_transactions', JSON.stringify(items));
-
-      if (items.length === 0) {
-        // Seed initial transactions
-        const batch = writeBatch(db);
-        INITIAL_TRANSACTIONS.forEach((t) => {
-          batch.set(doc(db, 'transactions', t.id), t);
-        });
-        batch.commit().catch(e => console.error("Failed to seed transactions:", e));
-      }
     }, (err) => console.error("Firestore transactions error:", err));
 
     // 5. Cashiers Listener
@@ -317,15 +319,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setCashiers(items);
       localStorage.setItem('kasirku_cashiers', JSON.stringify(items));
-
-      if (items.length === 0) {
-        // Seed initial cashiers
-        const batch = writeBatch(db);
-        INITIAL_CASHIERS.forEach((c) => {
-          batch.set(doc(db, 'cashiers', c.id), c);
-        });
-        batch.commit().catch(e => console.error("Failed to seed cashiers:", e));
-      }
     }, (err) => console.error("Firestore cashiers error:", err));
 
     setHasLoadedFromServer(true);
