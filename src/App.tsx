@@ -9,6 +9,7 @@ import { StockManagementView } from './components/inventory/StockManagementView'
 import { ProductCatalogView } from './components/products/ProductCatalogView';
 import { ReportsView } from './components/reports/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
+import { PwaInstallBanner } from './components/common/PwaInstallBanner';
 import { Lock, Shield, LogOut } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -145,6 +146,7 @@ const MainAppLayout: React.FC = () => {
       </main>
       <PinModal />
       <FooterBar />
+      <PwaInstallBanner />
     </div>
   );
 };
