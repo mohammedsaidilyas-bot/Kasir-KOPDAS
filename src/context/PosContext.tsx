@@ -958,10 +958,13 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Product CRUD
   const addProduct = (newProd: Omit<Product, 'id'>) => {
+    isUpdatingFromServerRef.current = false;
     const id = `prod-${Date.now()}`;
     const product: Product = { ...newProd, id };
-    setProducts((prev) => [product, ...prev]);
+    const nextProducts = [product, ...products];
+    setProducts(nextProducts);
 
+    let nextMovements = stockMovements;
     // Record initial stock if > 0
     if (product.stock > 0) {
       const movement: StockMovement = {
@@ -977,18 +980,69 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timestamp: new Date().toISOString(),
         operator: currentUserName,
       };
-      setStockMovements((prev) => [movement, ...prev]);
+      nextMovements = [movement, ...stockMovements];
+      setStockMovements(nextMovements);
     }
+
+    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
+    localStorage.setItem('kasirku_movements', JSON.stringify(nextMovements));
+
+    fetch(getApiUrl('/api/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          settings,
+          products: nextProducts,
+          stockMovements: nextMovements,
+          transactions,
+          cashiers,
+        },
+      }),
+    }).catch((e) => console.error('Direct add save error:', e));
   };
 
   const updateProduct = (updated: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    isUpdatingFromServerRef.current = false;
+    const nextProducts = products.map((p) => (p.id === updated.id ? updated : p));
+    setProducts(nextProducts);
+    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
+
+    fetch(getApiUrl('/api/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          settings,
+          products: nextProducts,
+          stockMovements,
+          transactions,
+          cashiers,
+        },
+      }),
+    }).catch((e) => console.error('Direct update save error:', e));
   };
 
   const deleteProduct = (productId: string) => {
     isUpdatingFromServerRef.current = false;
-    setProducts((prev) => prev.filter((p) => p.id !== productId));
+    const nextProducts = products.filter((p) => p.id !== productId);
+    setProducts(nextProducts);
     removeFromCart(productId);
+    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
+
+    fetch(getApiUrl('/api/save'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          settings,
+          products: nextProducts,
+          stockMovements,
+          transactions,
+          cashiers,
+        },
+      }),
+    }).catch((e) => console.error('Direct delete save error:', e));
   };
 
   // Settings
