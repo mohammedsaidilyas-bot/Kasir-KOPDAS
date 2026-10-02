@@ -15,9 +15,16 @@ export default function handler(req: any, res: any) {
     if (!data) {
       return res.status(400).json({ success: false, message: 'Missing data' });
     }
-    const DATA_FILE = path.join('/tmp', 'data.json');
+    const TMP_DATA_FILE = path.join('/tmp', 'data.json');
+    const ROOT_DATA_FILE = path.join(process.cwd(), 'data.json');
+
     try {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      fs.writeFileSync(TMP_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      try {
+        fs.writeFileSync(ROOT_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+      } catch (e) {
+        // Root dir might be read-only on serverless, ignoring root write error
+      }
       return res.status(200).json({ success: true });
     } catch (e) {
       return res.status(500).json({ success: false, message: (e as Error).message });

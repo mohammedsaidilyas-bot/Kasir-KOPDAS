@@ -10,13 +10,23 @@ export default function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
-  const DATA_FILE = path.join('/tmp', 'data.json');
+  const TMP_DATA_FILE = path.join('/tmp', 'data.json');
+  const ROOT_DATA_FILE = path.join(process.cwd(), 'data.json');
+
   let data = null;
-  if (fs.existsSync(DATA_FILE)) {
+  if (fs.existsSync(TMP_DATA_FILE)) {
     try {
-      data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      data = JSON.parse(fs.readFileSync(TMP_DATA_FILE, 'utf-8'));
     } catch (e) {
       console.error('Error reading /tmp/data.json:', e);
+    }
+  }
+
+  if (!data && fs.existsSync(ROOT_DATA_FILE)) {
+    try {
+      data = JSON.parse(fs.readFileSync(ROOT_DATA_FILE, 'utf-8'));
+    } catch (e) {
+      console.error('Error reading root data.json:', e);
     }
   }
 

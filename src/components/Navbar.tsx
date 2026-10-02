@@ -12,6 +12,7 @@ import {
   Layers,
   Send,
   LogOut,
+  RefreshCw,
 } from 'lucide-react';
 import { usePos } from '../context/PosContext';
 import { UserRole } from '../types';
@@ -32,9 +33,25 @@ export const Navbar: React.FC = () => {
     cartTotalQty,
     settings,
     cashiers,
+    forceRefreshFromServer,
   } = usePos();
 
   const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncMsg('SINKRON...');
+    const ok = await forceRefreshFromServer();
+    setIsSyncing(false);
+    if (ok) {
+      setSyncMsg('DATA REFRESHED!');
+    } else {
+      setSyncMsg('OFLINE');
+    }
+    setTimeout(() => setSyncMsg(null), 2500);
+  };
 
   const navItems = [
     {
@@ -260,6 +277,20 @@ export const Navbar: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Cloud Sync Button */}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+            title="Klik untuk memperbarui data langsung dari Server Cloud"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-semibold">
+              {syncMsg || 'Sinkron'}
+            </span>
+          </button>
 
           {/* Quick Lock / Switch User Button */}
           <button

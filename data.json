@@ -1,0 +1,609 @@
+{
+  "settings": {
+    "storeName": "KOPDES SENDANG DAJAH",
+    "tagline": "Pusat Belanja Grosir & Eceran Terpercaya",
+    "address": "Jl Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan",
+    "phone": "0812-3456-7890",
+    "receiptFooter": "Simpan struk ini sebagai bukti pembayaran yang sah. Terima kasih!",
+    "pinKasir": "1234",
+    "pinPengelola": "5678",
+    "pinAdmin": "9999",
+    "adminWaPhone": "085704800313"
+  },
+  "products": [],
+  "stockMovements": [
+    {
+      "id": "MOV-INIT-1790926186214",
+      "productId": "prod-1790926186214",
+      "productName": "Nipis madu",
+      "type": "masuk",
+      "qty": 36,
+      "previousStock": 0,
+      "newStock": 36,
+      "reason": "koreksi_stok",
+      "notes": "Stok awal penambahan produk baru",
+      "timestamp": "2026-10-02T07:29:46.214Z",
+      "operator": "Administrator Toko"
+    },
+    {
+      "id": "MOV-INIT-1790921677393",
+      "productId": "prod-1790921677393",
+      "productName": "Indomi goreng",
+      "type": "masuk",
+      "qty": 400,
+      "previousStock": 0,
+      "newStock": 400,
+      "reason": "koreksi_stok",
+      "notes": "Stok awal penambahan produk baru",
+      "timestamp": "2026-10-02T06:14:37.393Z",
+      "operator": "Administrator Toko"
+    },
+    {
+      "id": "MOV-1790877326336-424",
+      "productId": "prod-1",
+      "productName": "Beras Ramos Super 5kg",
+      "type": "keluar",
+      "qty": 1,
+      "previousStock": 40,
+      "newStock": 39,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-8858 (1 karung)",
+      "timestamp": "2026-10-01T17:55:26.336Z",
+      "operator": "Dzulhilmi"
+    },
+    {
+      "id": "MOV-1790877326336-80",
+      "productId": "prod-3",
+      "productName": "Gula Pasir Gulaku 1kg",
+      "type": "keluar",
+      "qty": 10,
+      "previousStock": 68,
+      "newStock": 58,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-8858 (10 kg)",
+      "timestamp": "2026-10-01T17:55:26.336Z",
+      "operator": "Dzulhilmi"
+    },
+    {
+      "id": "MOV-1790877241801-13",
+      "productId": "prod-1",
+      "productName": "Beras Ramos Super 5kg",
+      "type": "keluar",
+      "qty": 5,
+      "previousStock": 45,
+      "newStock": 40,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-7266 (5 karung)",
+      "timestamp": "2026-10-01T17:54:01.801Z",
+      "operator": "Dzulhilmi"
+    },
+    {
+      "id": "MOV-1790877241801-19",
+      "productId": "prod-3",
+      "productName": "Gula Pasir Gulaku 1kg",
+      "type": "keluar",
+      "qty": 11,
+      "previousStock": 79,
+      "newStock": 68,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-7266 (11 kg)",
+      "timestamp": "2026-10-01T17:54:01.801Z",
+      "operator": "Dzulhilmi"
+    },
+    {
+      "id": "MOV-1790877241801-150",
+      "productId": "prod-5",
+      "productName": "Indomie Goreng Original (Ecer Satuan)",
+      "type": "keluar",
+      "qty": 10,
+      "previousStock": 120,
+      "newStock": 110,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-7266 (10 pcs)",
+      "timestamp": "2026-10-01T17:54:01.801Z",
+      "operator": "Dzulhilmi"
+    },
+    {
+      "id": "MOV-1790875573918-650",
+      "productId": "prod-2",
+      "productName": "Minyak Goreng Sania 2L",
+      "type": "keluar",
+      "qty": 8,
+      "previousStock": 60,
+      "newStock": 52,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-2808 (ECER)",
+      "timestamp": "2026-10-01T17:26:13.918Z",
+      "operator": "Ahmad Syarif (Kasir 1)"
+    },
+    {
+      "id": "MOV-1790875573918-853",
+      "productId": "prod-3",
+      "productName": "Gula Pasir Gulaku 1kg",
+      "type": "keluar",
+      "qty": 1,
+      "previousStock": 80,
+      "newStock": 79,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-2808 (ECER)",
+      "timestamp": "2026-10-01T17:26:13.918Z",
+      "operator": "Ahmad Syarif (Kasir 1)"
+    },
+    {
+      "id": "MOV-1790875573918-73",
+      "productId": "prod-4",
+      "productName": "Indomie Goreng Original (Dus/40pcs)",
+      "type": "keluar",
+      "qty": 3,
+      "previousStock": 23,
+      "newStock": 20,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-2808 (GROSIR)",
+      "timestamp": "2026-10-01T17:26:13.918Z",
+      "operator": "Ahmad Syarif (Kasir 1)"
+    },
+    {
+      "id": "MOV-1790873360622-648",
+      "productId": "prod-4",
+      "productName": "Indomie Goreng Original (Dus/40pcs)",
+      "type": "keluar",
+      "qty": 2,
+      "previousStock": 25,
+      "newStock": 23,
+      "reason": "penjualan",
+      "notes": "Penjualan No. TRX-20261001-2791 (GROSIR)",
+      "timestamp": "2026-10-01T16:49:20.622Z",
+      "operator": "Kasir Utama"
+    },
+    {
+      "id": "MOV-001",
+      "productId": "prod-1",
+      "productName": "Beras Ramos Super 5kg",
+      "type": "masuk",
+      "qty": 50,
+      "previousStock": 0,
+      "newStock": 50,
+      "reason": "pembelian_supplier",
+      "notes": "Penerimaan stok awal dari Distributor Beras Sejahtera",
+      "supplier": "PT Beras Sejahtera Nusantara",
+      "costPrice": 65000,
+      "timestamp": "2026-09-28T16:44:24.373Z",
+      "operator": "Pengelola Gudang"
+    },
+    {
+      "id": "MOV-002",
+      "productId": "prod-2",
+      "productName": "Minyak Goreng Sania 2L",
+      "type": "masuk",
+      "qty": 70,
+      "previousStock": 0,
+      "newStock": 70,
+      "reason": "pembelian_supplier",
+      "notes": "Pengiriman PO No. 8832",
+      "supplier": "CV Mitra Pangan",
+      "costPrice": 31000,
+      "timestamp": "2026-09-29T16:44:24.376Z",
+      "operator": "Pengelola Gudang"
+    },
+    {
+      "id": "MOV-003",
+      "productId": "prod-9",
+      "productName": "Telur Ayam Negeri 1kg",
+      "type": "keluar",
+      "qty": 3,
+      "previousStock": 20,
+      "newStock": 17,
+      "reason": "rusak_kadaluarsa",
+      "notes": "Pecah saat bongkar muat pengiriman",
+      "timestamp": "2026-10-01T04:44:24.376Z",
+      "operator": "Pengelola Gudang"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "TRX-20261001-8858",
+      "timestamp": "2026-10-01T17:55:26.335Z",
+      "cashierName": "Dzulhilmi",
+      "cashierRole": "kasir",
+      "customerType": "grosir",
+      "items": [
+        {
+          "cartItemId": "prod-1-unit",
+          "product": {
+            "id": "prod-1",
+            "sku": "899123456001",
+            "name": "Beras Ramos Super 5kg",
+            "category": "Sembako",
+            "unit": "karung",
+            "costPrice": 65000,
+            "retailPrice": 75000,
+            "wholesalePrice": 70000,
+            "minWholesaleQty": 5,
+            "stock": 40,
+            "minStockAlert": 10
+          },
+          "qty": 1,
+          "priceType": "grosir",
+          "appliedPrice": 70000,
+          "subtotal": 70000,
+          "unitLabel": "karung"
+        },
+        {
+          "cartItemId": "prod-3-unit",
+          "product": {
+            "id": "prod-3",
+            "sku": "899123456003",
+            "name": "Gula Pasir Gulaku 1kg",
+            "category": "Sembako",
+            "unit": "kg",
+            "costPrice": 15500,
+            "retailPrice": 18500,
+            "wholesalePrice": 17000,
+            "minWholesaleQty": 10,
+            "stock": 68,
+            "minStockAlert": 15
+          },
+          "qty": 10,
+          "priceType": "grosir",
+          "appliedPrice": 17000,
+          "subtotal": 170000,
+          "unitLabel": "kg"
+        }
+      ],
+      "totalQty": 11,
+      "subtotal": 240000,
+      "discount": 0,
+      "grandTotal": 240000,
+      "paymentMethod": "tunai",
+      "cashReceived": 240000,
+      "changeDue": 0,
+      "status": "selesai"
+    },
+    {
+      "id": "TRX-20261001-7266",
+      "timestamp": "2026-10-01T17:54:01.801Z",
+      "cashierName": "Dzulhilmi",
+      "cashierRole": "kasir",
+      "customerType": "grosir",
+      "items": [
+        {
+          "cartItemId": "prod-1-unit",
+          "product": {
+            "id": "prod-1",
+            "sku": "899123456001",
+            "name": "Beras Ramos Super 5kg",
+            "category": "Sembako",
+            "unit": "karung",
+            "costPrice": 65000,
+            "retailPrice": 75000,
+            "wholesalePrice": 70000,
+            "minWholesaleQty": 5,
+            "stock": 45,
+            "minStockAlert": 10
+          },
+          "qty": 5,
+          "priceType": "grosir",
+          "appliedPrice": 70000,
+          "subtotal": 350000,
+          "unitLabel": "karung"
+        },
+        {
+          "cartItemId": "prod-3-unit",
+          "product": {
+            "id": "prod-3",
+            "sku": "899123456003",
+            "name": "Gula Pasir Gulaku 1kg",
+            "category": "Sembako",
+            "unit": "kg",
+            "costPrice": 15500,
+            "retailPrice": 18500,
+            "wholesalePrice": 17000,
+            "minWholesaleQty": 10,
+            "stock": 79,
+            "minStockAlert": 15
+          },
+          "qty": 11,
+          "priceType": "grosir",
+          "appliedPrice": 17000,
+          "subtotal": 187000,
+          "unitLabel": "kg"
+        },
+        {
+          "cartItemId": "prod-5-unit",
+          "product": {
+            "id": "prod-5",
+            "sku": "899123456005",
+            "name": "Indomie Goreng Original (Ecer Satuan)",
+            "category": "Makanan Ringan",
+            "unit": "pcs",
+            "costPrice": 2800,
+            "retailPrice": 3500,
+            "wholesalePrice": 3100,
+            "minWholesaleQty": 10,
+            "stock": 120,
+            "minStockAlert": 20
+          },
+          "qty": 10,
+          "priceType": "grosir",
+          "appliedPrice": 3100,
+          "subtotal": 31000,
+          "unitLabel": "pcs"
+        }
+      ],
+      "totalQty": 26,
+      "subtotal": 568000,
+      "discount": 0,
+      "grandTotal": 568000,
+      "paymentMethod": "tunai",
+      "cashReceived": 568000,
+      "changeDue": 0,
+      "status": "selesai"
+    },
+    {
+      "id": "TRX-20261001-2808",
+      "timestamp": "2026-10-01T17:26:13.918Z",
+      "cashierName": "Ahmad Syarif (Kasir 1)",
+      "cashierRole": "kasir",
+      "customerType": "ecer",
+      "items": [
+        {
+          "product": {
+            "id": "prod-2",
+            "sku": "899123456002",
+            "name": "Minyak Goreng Sania 2L",
+            "category": "Sembako",
+            "unit": "pouch",
+            "costPrice": 31000,
+            "retailPrice": 36000,
+            "wholesalePrice": 33500,
+            "minWholesaleQty": 6,
+            "stock": 60,
+            "minStockAlert": 12
+          },
+          "qty": 8,
+          "priceType": "ecer",
+          "appliedPrice": 36000,
+          "subtotal": 288000
+        },
+        {
+          "product": {
+            "id": "prod-4",
+            "sku": "899123456004",
+            "name": "Indomie Goreng Original (Dus/40pcs)",
+            "category": "Makanan Ringan",
+            "unit": "dus",
+            "costPrice": 112000,
+            "retailPrice": 125000,
+            "wholesalePrice": 118000,
+            "minWholesaleQty": 3,
+            "stock": 23,
+            "minStockAlert": 5
+          },
+          "qty": 3,
+          "priceType": "grosir",
+          "appliedPrice": 118000,
+          "subtotal": 354000
+        },
+        {
+          "product": {
+            "id": "prod-3",
+            "sku": "899123456003",
+            "name": "Gula Pasir Gulaku 1kg",
+            "category": "Sembako",
+            "unit": "kg",
+            "costPrice": 15500,
+            "retailPrice": 18500,
+            "wholesalePrice": 17000,
+            "minWholesaleQty": 10,
+            "stock": 80,
+            "minStockAlert": 15
+          },
+          "qty": 1,
+          "priceType": "ecer",
+          "appliedPrice": 18500,
+          "subtotal": 18500
+        }
+      ],
+      "totalQty": 12,
+      "subtotal": 660500,
+      "discount": 0,
+      "grandTotal": 660500,
+      "paymentMethod": "tunai",
+      "cashReceived": 660500,
+      "changeDue": 0,
+      "status": "selesai"
+    },
+    {
+      "id": "TRX-20261001-2791",
+      "timestamp": "2026-10-01T16:49:20.621Z",
+      "cashierName": "Kasir Utama",
+      "cashierRole": "kasir",
+      "customerType": "grosir",
+      "items": [
+        {
+          "product": {
+            "id": "prod-4",
+            "sku": "899123456004",
+            "name": "Indomie Goreng Original (Dus/40pcs)",
+            "category": "Makanan Ringan",
+            "unit": "dus",
+            "costPrice": 112000,
+            "retailPrice": 125000,
+            "wholesalePrice": 118000,
+            "minWholesaleQty": 3,
+            "stock": 25,
+            "minStockAlert": 5
+          },
+          "qty": 2,
+          "priceType": "grosir",
+          "appliedPrice": 118000,
+          "subtotal": 236000
+        }
+      ],
+      "totalQty": 2,
+      "subtotal": 236000,
+      "discount": 0,
+      "grandTotal": 236000,
+      "paymentMethod": "tunai",
+      "cashReceived": 500000,
+      "changeDue": 264000,
+      "status": "selesai"
+    },
+    {
+      "id": "TRX-20261001-001",
+      "timestamp": "2026-10-01T12:44:24.376Z",
+      "cashierName": "Ahmad (Kasir 1)",
+      "cashierRole": "kasir",
+      "customerType": "ecer",
+      "customerName": "Ibu Ratna",
+      "items": [
+        {
+          "product": {
+            "id": "prod-2",
+            "sku": "899123456002",
+            "name": "Minyak Goreng Sania 2L",
+            "category": "Sembako",
+            "unit": "pouch",
+            "costPrice": 31000,
+            "retailPrice": 36000,
+            "wholesalePrice": 33500,
+            "minWholesaleQty": 6,
+            "stock": 60,
+            "minStockAlert": 12
+          },
+          "qty": 1,
+          "priceType": "ecer",
+          "appliedPrice": 36000,
+          "subtotal": 36000
+        },
+        {
+          "product": {
+            "id": "prod-3",
+            "sku": "899123456003",
+            "name": "Gula Pasir Gulaku 1kg",
+            "category": "Sembako",
+            "unit": "kg",
+            "costPrice": 15500,
+            "retailPrice": 18500,
+            "wholesalePrice": 17000,
+            "minWholesaleQty": 10,
+            "stock": 80,
+            "minStockAlert": 15
+          },
+          "qty": 2,
+          "priceType": "ecer",
+          "appliedPrice": 18500,
+          "subtotal": 37000
+        }
+      ],
+      "totalQty": 3,
+      "subtotal": 73000,
+      "discount": 0,
+      "grandTotal": 73000,
+      "paymentMethod": "tunai",
+      "cashReceived": 100000,
+      "changeDue": 27000,
+      "status": "selesai"
+    },
+    {
+      "id": "TRX-20261001-002",
+      "timestamp": "2026-10-01T14:44:24.376Z",
+      "cashierName": "Ahmad (Kasir 1)",
+      "cashierRole": "kasir",
+      "customerType": "grosir",
+      "customerName": "Warung Bu Siti",
+      "items": [
+        {
+          "product": {
+            "id": "prod-1",
+            "sku": "899123456001",
+            "name": "Beras Ramos Super 5kg",
+            "category": "Sembako",
+            "unit": "karung",
+            "costPrice": 65000,
+            "retailPrice": 75000,
+            "wholesalePrice": 70000,
+            "minWholesaleQty": 5,
+            "stock": 45,
+            "minStockAlert": 10
+          },
+          "qty": 5,
+          "priceType": "grosir",
+          "appliedPrice": 70000,
+          "subtotal": 350000
+        },
+        {
+          "product": {
+            "id": "prod-4",
+            "sku": "899123456004",
+            "name": "Indomie Goreng Original (Dus/40pcs)",
+            "category": "Makanan Ringan",
+            "unit": "dus",
+            "costPrice": 112000,
+            "retailPrice": 125000,
+            "wholesalePrice": 118000,
+            "minWholesaleQty": 3,
+            "stock": 25,
+            "minStockAlert": 5
+          },
+          "qty": 4,
+          "priceType": "grosir",
+          "appliedPrice": 118000,
+          "subtotal": 472000
+        },
+        {
+          "product": {
+            "id": "prod-2",
+            "sku": "899123456002",
+            "name": "Minyak Goreng Sania 2L",
+            "category": "Sembako",
+            "unit": "pouch",
+            "costPrice": 31000,
+            "retailPrice": 36000,
+            "wholesalePrice": 33500,
+            "minWholesaleQty": 6,
+            "stock": 60,
+            "minStockAlert": 12
+          },
+          "qty": 6,
+          "priceType": "grosir",
+          "appliedPrice": 33500,
+          "subtotal": 201000
+        }
+      ],
+      "totalQty": 15,
+      "subtotal": 1023000,
+      "discount": 23000,
+      "grandTotal": 1000000,
+      "paymentMethod": "qris",
+      "referenceNo": "QRIS-NMID-992104928",
+      "status": "selesai"
+    }
+  ],
+  "cashiers": [
+    {
+      "id": "csh-1",
+      "name": "Dzulhilmi",
+      "pin": "1234",
+      "role": "kasir",
+      "isActive": true,
+      "createdAt": "2026-10-01T17:05:01.012Z"
+    },
+    {
+      "id": "csh-2",
+      "name": "M Yunos",
+      "pin": "1111",
+      "role": "kasir",
+      "isActive": true,
+      "createdAt": "2026-10-01T17:05:01.012Z"
+    },
+    {
+      "id": "csh-3",
+      "name": "Budi Santoso (Shift Malam)",
+      "pin": "2222",
+      "role": "kasir",
+      "isActive": true,
+      "createdAt": "2026-10-01T17:05:01.012Z"
+    }
+  ]
+}

@@ -108,6 +108,9 @@ interface PosContextType {
   settings: StoreSettings;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   resetAllData: () => void;
+
+  // Cloud Sync
+  forceRefreshFromServer: () => Promise<boolean>;
 }
 
 const PosContext = createContext<PosContextType | undefined>(undefined);
@@ -191,19 +194,57 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isUpdatingFromServerRef = useRef<boolean>(false);
 
   const getApiUrl = (path: string) => {
-    // If we are running in an APK (file:// protocol) or some non-cloud environment,
-    // we must target the absolute URL of the deployment server.
-    if (
-      window.location.protocol === 'file:' ||
-      (
-        !window.location.hostname.includes('run.app') &&
-        !window.location.hostname.includes('vercel.app') &&
-        !window.location.hostname.includes('localhost')
-      )
-    ) {
+    // If running in Cloud Run or Vercel web domain directly in browser
+    const isCloudWebDomain =
+      window.location.hostname.endsWith('run.app') ||
+      window.location.hostname.endsWith('vercel.app');
+
+    // If running in an APK, Capacitor WebView, file://, or localhost inside APK,
+    // we MUST target the absolute live cloud server endpoint!
+    if (!isCloudWebDomain) {
       return `https://ais-pre-5ifxiuva2vp7wnisdevtp3-459294540144.asia-southeast1.run.app${path}`;
     }
     return path;
+  };
+
+  const forceRefreshFromServer = async (): Promise<boolean> => {
+    try {
+      const res = await fetch(getApiUrl('/api/data'));
+      const resData = await res.json();
+      if (resData.success && resData.data) {
+        const d = resData.data;
+        isUpdatingFromServerRef.current = true;
+        if (d.settings) {
+          if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
+            d.settings.storeName = 'KOPDES SENDANG DAJAH';
+            d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
+            d.settings.adminWaPhone = '085704800313';
+          }
+          setSettings(d.settings);
+          localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
+        }
+        if (Array.isArray(d.products)) {
+          setProducts(d.products);
+          localStorage.setItem('kasirku_products', JSON.stringify(d.products));
+        }
+        if (d.stockMovements) {
+          setStockMovements(d.stockMovements);
+          localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
+        }
+        if (d.transactions) {
+          setTransactions(d.transactions);
+          localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
+        }
+        if (d.cashiers) {
+          setCashiers(d.cashiers);
+          localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
+        }
+        return true;
+      }
+    } catch (e) {
+      console.error("Force refresh error:", e);
+    }
+    return false;
   };
 
   useEffect(() => {
@@ -237,7 +278,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setSettings(d.settings);
             localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
           }
-          if (d.products) {
+          if (Array.isArray(d.products)) {
             setProducts(d.products);
             localStorage.setItem('kasirku_products', JSON.stringify(d.products));
           }
@@ -285,7 +326,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 updated = true;
               }
             }
-            if (d.products && JSON.stringify(d.products) !== JSON.stringify(products)) {
+            if (Array.isArray(d.products) && JSON.stringify(d.products) !== JSON.stringify(products)) {
               setProducts(d.products);
               localStorage.setItem('kasirku_products', JSON.stringify(d.products));
               updated = true;
@@ -1123,6 +1164,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         updateSettings,
         resetAllData,
+        forceRefreshFromServer,
       }}
     >
       {children}
