@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Filter,
   Barcode,
+  Camera,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { StockReason } from '../../types';
@@ -18,15 +19,18 @@ import {
   formatDateTime,
   formatNumber,
 } from '../../utils/formatters';
+import { LiveCameraScannerModal } from '../common/LiveCameraScannerModal';
 
 export const StockManagementView: React.FC = () => {
   const { products, stockMovements, recordStockIn, recordStockOut } = usePos();
 
   const [activeSubTab, setActiveSubTab] = useState<'masuk' | 'keluar' | 'status' | 'riwayat'>('masuk');
 
-  // Scanner inputs
+  // Scanner inputs & modals
   const [scanBarcodeIn, setScanBarcodeIn] = useState('');
   const [scanBarcodeOut, setScanBarcodeOut] = useState('');
+  const [isCameraScanInOpen, setIsCameraScanInOpen] = useState(false);
+  const [isCameraScanOutOpen, setIsCameraScanOutOpen] = useState(false);
 
   // Form Stock In states
   const [inProductId, setInProductId] = useState<string>(products[0]?.id || '');
@@ -215,10 +219,20 @@ export const StockManagementView: React.FC = () => {
 
             <form onSubmit={handleStockInSubmit} className="space-y-4">
               <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                  <Barcode className="w-3.5 h-3.5 text-neutral-600" />
-                  <span>Scan Barcode / SKU Cepat:</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-neutral-700 flex items-center gap-1.5">
+                    <Barcode className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Scan Barcode / SKU Cepat:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraScanInOpen(true)}
+                    className="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded font-bold border border-emerald-200 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>Scan Kamera</span>
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -397,10 +411,20 @@ export const StockManagementView: React.FC = () => {
 
             <form onSubmit={handleStockOutSubmit} className="space-y-4">
               <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                  <Barcode className="w-3.5 h-3.5 text-neutral-600" />
-                  <span>Scan Barcode / SKU Cepat:</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-neutral-700 flex items-center gap-1.5">
+                    <Barcode className="w-3.5 h-3.5 text-neutral-600" />
+                    <span>Scan Barcode / SKU Cepat:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraScanOutOpen(true)}
+                    className="text-[10px] bg-rose-50 text-rose-700 hover:bg-rose-100 px-2 py-0.5 rounded font-bold border border-rose-200 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Camera className="w-3 h-3" />
+                    <span>Scan Kamera</span>
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -742,6 +766,36 @@ export const StockManagementView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <LiveCameraScannerModal
+        isOpen={isCameraScanInOpen}
+        onClose={() => setIsCameraScanInOpen(false)}
+        onScanSuccess={(code) => {
+          const found = products.find((p) => p.sku.toLowerCase() === code.trim().toLowerCase());
+          if (found) {
+            handleInProductChange(found.id);
+            setInSuccessMsg(`Produk "${found.name}" terpilih via kamera!`);
+            setTimeout(() => setInSuccessMsg(''), 3000);
+          } else {
+            alert(`Produk dengan barcode "${code}" tidak ditemukan di inventaris.`);
+          }
+        }}
+        title="Scan Barcode Barang Masuk"
+      />
+
+      <LiveCameraScannerModal
+        isOpen={isCameraScanOutOpen}
+        onClose={() => setIsCameraScanOutOpen(false)}
+        onScanSuccess={(code) => {
+          const found = products.find((p) => p.sku.toLowerCase() === code.trim().toLowerCase());
+          if (found) {
+            setOutProductId(found.id);
+          } else {
+            alert(`Produk dengan barcode "${code}" tidak ditemukan di inventaris.`);
+          }
+        }}
+        title="Scan Barcode Barang Keluar"
+      />
     </div>
   );
 };

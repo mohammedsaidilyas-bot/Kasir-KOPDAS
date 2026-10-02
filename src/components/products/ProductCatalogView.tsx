@@ -15,6 +15,7 @@ import {
 import { usePos } from '../../context/PosContext';
 import { Product } from '../../types';
 import { formatRupiah, formatNumber } from '../../utils/formatters';
+import { LiveCameraScannerModal } from '../common/LiveCameraScannerModal';
 
 export const ProductCatalogView: React.FC = () => {
   const { products, addProduct, updateProduct, deleteProduct } = usePos();
@@ -653,56 +654,12 @@ export const ProductCatalogView: React.FC = () => {
         </div>
       )}
 
-      {/* Camera Barcode Scanner Modal */}
-      {isCameraScanOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                <Camera className="w-4 h-4 text-emerald-600 animate-pulse" />
-                <span>Scan Barcode via Kamera</span>
-              </h3>
-              <button
-                onClick={() => setIsCameraScanOpen(false)}
-                className="text-neutral-400 hover:text-neutral-700 p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border-2 border-emerald-500">
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-48 h-24 border-2 border-dashed border-emerald-400 rounded-lg flex items-center justify-center">
-                  <span className="text-[10px] text-emerald-300 font-mono bg-neutral-900/80 px-2 py-1 rounded">
-                    Posisikan Barcode di Sini
-                  </span>
-                </div>
-                <div className="absolute w-full h-0.5 bg-rose-500 animate-bounce shadow-[0_0_12px_rgba(244,63,94,0.8)]" />
-              </div>
-              <p className="text-xs text-neutral-400 px-4">
-                Arahkan kamera perangkat ke barcode produk...
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const scannedSku = `899${Math.floor(100000000 + Math.random() * 900000000)}`;
-                  setFormData((prev) => ({ ...prev, sku: scannedSku }));
-                  setIsCameraScanOpen(false);
-                }}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-              >
-                Ambil / Deteksi Barcode
-              </button>
-              <p className="text-[10px] text-neutral-400">
-                Atau gunakan scanner fisik USB/Bluetooth (input otomatis aktif).
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <LiveCameraScannerModal
+        isOpen={isCameraScanOpen}
+        onClose={() => setIsCameraScanOpen(false)}
+        onScanSuccess={(code) => setFormData((prev) => ({ ...prev, sku: code }))}
+        title="Scan Barcode Produk via Kamera"
+      />
     </div>
   );
 };
