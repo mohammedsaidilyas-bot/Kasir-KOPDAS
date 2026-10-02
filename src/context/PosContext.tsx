@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Product,
   CartItem,
@@ -188,6 +188,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync to Storage
   const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
+  const isUpdatingFromServerRef = useRef<boolean>(false);
 
   const getApiUrl = (path: string) => {
     // If we are running in an APK (file:// protocol) or some non-cloud environment,
@@ -226,6 +227,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then((resData) => {
         if (resData.success && resData.data) {
           const d = resData.data;
+          isUpdatingFromServerRef.current = true;
           if (d.settings) {
             if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
               d.settings.storeName = 'KOPDES SENDANG DAJAH';
@@ -233,11 +235,24 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               d.settings.adminWaPhone = '085704800313';
             }
             setSettings(d.settings);
+            localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
           }
-          if (d.products) setProducts(d.products);
-          if (d.stockMovements) setStockMovements(d.stockMovements);
-          if (d.transactions) setTransactions(d.transactions);
-          if (d.cashiers) setCashiers(d.cashiers);
+          if (d.products) {
+            setProducts(d.products);
+            localStorage.setItem('kasirku_products', JSON.stringify(d.products));
+          }
+          if (d.stockMovements) {
+            setStockMovements(d.stockMovements);
+            localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
+          }
+          if (d.transactions) {
+            setTransactions(d.transactions);
+            localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
+          }
+          if (d.cashiers) {
+            setCashiers(d.cashiers);
+            localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
+          }
         }
         setHasLoadedFromServer(true);
       })
@@ -247,7 +262,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   }, []);
 
-  // 2. Continuous Polling from Server to stay in sync with other devices/APK
+  // 2. Continuous Polling from Server every 1.5s to stay in real-time sync across all APKs
   useEffect(() => {
     if (!hasLoadedFromServer) return;
     const interval = setInterval(() => {
@@ -256,6 +271,8 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then((resData) => {
           if (resData.success && resData.data) {
             const d = resData.data;
+            let updated = false;
+
             if (d.settings) {
               if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
                 d.settings.storeName = 'KOPDES SENDANG DAJAH';
@@ -264,31 +281,51 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               if (JSON.stringify(d.settings) !== JSON.stringify(settings)) {
                 setSettings(d.settings);
+                localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
+                updated = true;
               }
             }
             if (d.products && JSON.stringify(d.products) !== JSON.stringify(products)) {
               setProducts(d.products);
+              localStorage.setItem('kasirku_products', JSON.stringify(d.products));
+              updated = true;
             }
             if (d.stockMovements && JSON.stringify(d.stockMovements) !== JSON.stringify(stockMovements)) {
               setStockMovements(d.stockMovements);
+              localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
+              updated = true;
             }
             if (d.transactions && JSON.stringify(d.transactions) !== JSON.stringify(transactions)) {
               setTransactions(d.transactions);
+              localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
+              updated = true;
             }
             if (d.cashiers && JSON.stringify(d.cashiers) !== JSON.stringify(cashiers)) {
               setCashiers(d.cashiers);
+              localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
+              updated = true;
+            }
+
+            if (updated) {
+              isUpdatingFromServerRef.current = true;
             }
           }
         })
         .catch((err) => console.error("Polling error:", err));
-    }, 5000); // Poll every 5 seconds
+    }, 1500); // Fast 1.5-second polling interval
 
     return () => clearInterval(interval);
   }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
 
-  // 3. Save to server whenever state changes
+  // 3. Save to server whenever state changes from LOCAL USER action
   useEffect(() => {
     if (!hasLoadedFromServer) return;
+
+    if (isUpdatingFromServerRef.current) {
+      // Received update from server, do not echo back
+      isUpdatingFromServerRef.current = false;
+      return;
+    }
 
     // Save to localStorage as local backup
     localStorage.setItem('kasirku_settings', JSON.stringify(settings));
@@ -949,6 +986,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteProduct = (productId: string) => {
+    isUpdatingFromServerRef.current = false;
     setProducts((prev) => prev.filter((p) => p.id !== productId));
     removeFromCart(productId);
   };
