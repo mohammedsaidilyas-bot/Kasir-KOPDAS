@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "settings": {
+      "title": "StoreSettings",
+      "description": "Global store configuration and credentials",
+      "type": "object",
+      "properties": {
+        "storeName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "adminWaPhone": { "type": "string" },
+        "receiptFooter": { "type": "string" },
+        "pinKasir": { "type": "string" },
+        "pinPengelola": { "type": "string" },
+        "pinAdmin": { "type": "string" }
+      },
+      "required": ["storeName", "address", "phone", "adminWaPhone", "pinKasir", "pinPengelola", "pinAdmin"]
+    },
+    "product": {
+      "title": "Product",
+      "description": "Product inventory and pricing details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sku": { "type": "string" },
+        "boxSku": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "retailPrice": { "type": "number" },
+        "wholesalePrice": { "type": "number" },
+        "minWholesaleQty": { "type": "number" },
+        "hasBox": { "type": "boolean" },
+        "boxQty": { "type": "number" },
+        "boxCostPrice": { "type": "number" },
+        "boxPrice": { "type": "number" },
+        "boxUnit": { "type": "string" },
+        "stock": { "type": "number" },
+        "minStockAlert": { "type": "number" }
+      },
+      "required": ["id", "sku", "name", "category", "unit", "costPrice", "retailPrice", "wholesalePrice", "stock"]
+    },
+    "stockMovement": {
+      "title": "StockMovement",
+      "description": "Pencatatan riwayat barang masuk/keluar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "type": { "type": "string", "enum": ["masuk", "keluar"] },
+        "qty": { "type": "number" },
+        "previousStock": { "type": "number" },
+        "newStock": { "type": "number" },
+        "reason": { "type": "string" },
+        "notes": { "type": "string" },
+        "supplier": { "type": "string" },
+        "costPrice": { "type": "number" },
+        "timestamp": { "type": "string" },
+        "operator": { "type": "string" }
+      },
+      "required": ["id", "productId", "productName", "type", "qty", "previousStock", "newStock", "reason", "timestamp", "operator"]
+    },
+    "transaction": {
+      "title": "SaleTransaction",
+      "description": "Penjualan dari kasir",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "cashierName": { "type": "string" },
+        "cashierRole": { "type": "string", "enum": ["kasir", "pengelola", "admin"] },
+        "customerType": { "type": "string", "enum": ["ecer", "grosir", "dus"] },
+        "customerName": { "type": "string" },
+        "items": { "type": "array" },
+        "totalQty": { "type": "number" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["tunai", "qris", "transfer", "debit"] },
+        "cashReceived": { "type": "number" },
+        "changeDue": { "type": "number" },
+        "referenceNo": { "type": "string" },
+        "status": { "type": "string", "enum": ["selesai", "dibatalkan"] }
+      },
+      "required": ["id", "timestamp", "cashierName", "cashierRole", "customerType", "items", "totalQty", "subtotal", "grandTotal", "paymentMethod", "status"]
+    },
+    "cashier": {
+      "title": "CashierUser",
+      "description": "Daftar Kasir berlisensi",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "pin": { "type": "string" },
+        "role": { "type": "string", "enum": ["kasir"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "pin", "role", "isActive", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/settings/{configId}": {
+      "schema": "settings",
+      "description": "Global settings document"
+    },
+    "/products/{productId}": {
+      "schema": "product",
+      "description": "Products list collection"
+    },
+    "/stockMovements/{movementId}": {
+      "schema": "stockMovement",
+      "description": "Stock inventory movement logs"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "transaction",
+      "description": "Sales transactions"
+    },
+    "/cashiers/{cashierId}": {
+      "schema": "cashier",
+      "description": "Cashier users collection"
+    }
+  }
+}

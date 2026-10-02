@@ -1,5 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
+  collection,
+  doc,
+  onSnapshot,
+  setDoc,
+  deleteDoc,
+  writeBatch,
+  getDoc,
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import {
   Product,
   CartItem,
   SaleTransaction,
@@ -53,9 +63,9 @@ interface PosContextType {
 
   // Products
   products: Product[];
-  addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (product: Product) => void;
-  deleteProduct: (productId: string) => void;
+  addProduct: (product: Omit<Product, 'id'>) => Promise<void>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
 
   // Cart & POS
   cart: CartItem[];
@@ -83,8 +93,8 @@ interface PosContextType {
     cashReceived?: number,
     changeDue?: number,
     referenceNo?: string
-  ) => SaleTransaction | null;
-  deleteTransaction: (id: string) => void;
+  ) => Promise<any>;
+  deleteTransaction: (id: string) => Promise<void>;
   latestTransaction: SaleTransaction | null;
   setLatestTransaction: (trx: SaleTransaction | null) => void;
 
@@ -96,18 +106,18 @@ interface PosContextType {
     costPrice?: number,
     supplier?: string,
     notes?: string
-  ) => void;
+  ) => Promise<void>;
   recordStockOut: (
     productId: string,
     qty: number,
     reason: StockReason,
     notes?: string
-  ) => void;
+  ) => Promise<void>;
 
   // Settings
   settings: StoreSettings;
-  updateSettings: (newSettings: Partial<StoreSettings>) => void;
-  resetAllData: () => void;
+  updateSettings: (newSettings: Partial<StoreSettings>) => Promise<void>;
+  resetAllData: () => Promise<void>;
 
   // Cloud Sync
   forceRefreshFromServer: () => Promise<boolean>;
@@ -209,43 +219,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const forceRefreshFromServer = async (): Promise<boolean> => {
-    try {
-      const res = await fetch(getApiUrl('/api/data'));
-      const resData = await res.json();
-      if (resData.success && resData.data) {
-        const d = resData.data;
-        isUpdatingFromServerRef.current = true;
-        if (d.settings) {
-          if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
-            d.settings.storeName = 'KOPDES SENDANG DAJAH';
-            d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
-            d.settings.adminWaPhone = '085704800313';
-          }
-          setSettings(d.settings);
-          localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
-        }
-        if (Array.isArray(d.products)) {
-          setProducts(d.products);
-          localStorage.setItem('kasirku_products', JSON.stringify(d.products));
-        }
-        if (d.stockMovements) {
-          setStockMovements(d.stockMovements);
-          localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
-        }
-        if (d.transactions) {
-          setTransactions(d.transactions);
-          localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
-        }
-        if (d.cashiers) {
-          setCashiers(d.cashiers);
-          localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
-        }
-        return true;
-      }
-    } catch (e) {
-      console.error("Force refresh error:", e);
-    }
-    return false;
+    return true;
   };
 
   useEffect(() => {
@@ -262,147 +236,124 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('kasirku_role', currentRole);
   }, [currentRole]);
 
-  // 1. Initial Load from Server
+  // 1. Initial Load & Real-time Listeners from Firestore
   useEffect(() => {
-    fetch(getApiUrl('/api/data'))
-      .then((res) => res.json())
-      .then((resData) => {
-        if (resData.success && resData.data) {
-          const d = resData.data;
-          isUpdatingFromServerRef.current = true;
-          if (d.settings) {
-            if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
-              d.settings.storeName = 'KOPDES SENDANG DAJAH';
-              d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
-              d.settings.adminWaPhone = '085704800313';
-            }
-            setSettings(d.settings);
-            localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
-          }
-          if (Array.isArray(d.products)) {
-            setProducts(d.products);
-            localStorage.setItem('kasirku_products', JSON.stringify(d.products));
-          }
-          if (d.stockMovements) {
-            setStockMovements(d.stockMovements);
-            localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
-          }
-          if (d.transactions) {
-            setTransactions(d.transactions);
-            localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
-          }
-          if (d.cashiers) {
-            setCashiers(d.cashiers);
-            localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
-          }
-        }
-        setHasLoadedFromServer(true);
-      })
-      .catch((err) => {
-        console.error("Failed to load from server, using localStorage:", err);
-        setHasLoadedFromServer(true);
+    // 1. Settings Listener
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data() as StoreSettings;
+        setSettings(data);
+        localStorage.setItem('kasirku_settings', JSON.stringify(data));
+      } else {
+        // Seed initial settings if empty
+        setDoc(doc(db, 'settings', 'config'), INITIAL_SETTINGS);
+      }
+    }, (err) => console.error("Firestore settings error:", err));
+
+    // 2. Products Listener
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const items: Product[] = [];
+      snapshot.forEach((doc) => {
+        items.push(doc.data() as Product);
       });
+      if (items.length > 0) {
+        setProducts(items);
+        localStorage.setItem('kasirku_products', JSON.stringify(items));
+      } else {
+        // Seed initial products if database is fresh
+        const batch = writeBatch(db);
+        INITIAL_PRODUCTS.forEach((p) => {
+          batch.set(doc(db, 'products', p.id), p);
+        });
+        batch.commit().catch(e => console.error("Failed to seed products:", e));
+      }
+    }, (err) => console.error("Firestore products error:", err));
+
+    // 3. Stock Movements Listener
+    const unsubMovements = onSnapshot(collection(db, 'stockMovements'), (snapshot) => {
+      const items: StockMovement[] = [];
+      snapshot.forEach((doc) => {
+        items.push(doc.data() as StockMovement);
+      });
+      items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setStockMovements(items);
+      localStorage.setItem('kasirku_movements', JSON.stringify(items));
+
+      if (items.length === 0) {
+        // Seed initial stock movements
+        const batch = writeBatch(db);
+        INITIAL_STOCK_MOVEMENTS.forEach((m) => {
+          batch.set(doc(db, 'stockMovements', m.id), m);
+        });
+        batch.commit().catch(e => console.error("Failed to seed movements:", e));
+      }
+    }, (err) => console.error("Firestore movements error:", err));
+
+    // 4. Transactions Listener
+    const unsubTransactions = onSnapshot(collection(db, 'transactions'), (snapshot) => {
+      const items: SaleTransaction[] = [];
+      snapshot.forEach((doc) => {
+        items.push(doc.data() as SaleTransaction);
+      });
+      items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setTransactions(items);
+      localStorage.setItem('kasirku_transactions', JSON.stringify(items));
+
+      if (items.length === 0) {
+        // Seed initial transactions
+        const batch = writeBatch(db);
+        INITIAL_TRANSACTIONS.forEach((t) => {
+          batch.set(doc(db, 'transactions', t.id), t);
+        });
+        batch.commit().catch(e => console.error("Failed to seed transactions:", e));
+      }
+    }, (err) => console.error("Firestore transactions error:", err));
+
+    // 5. Cashiers Listener
+    const unsubCashiers = onSnapshot(collection(db, 'cashiers'), (snapshot) => {
+      const items: CashierUser[] = [];
+      snapshot.forEach((doc) => {
+        items.push(doc.data() as CashierUser);
+      });
+      setCashiers(items);
+      localStorage.setItem('kasirku_cashiers', JSON.stringify(items));
+
+      if (items.length === 0) {
+        // Seed initial cashiers
+        const batch = writeBatch(db);
+        INITIAL_CASHIERS.forEach((c) => {
+          batch.set(doc(db, 'cashiers', c.id), c);
+        });
+        batch.commit().catch(e => console.error("Failed to seed cashiers:", e));
+      }
+    }, (err) => console.error("Firestore cashiers error:", err));
+
+    setHasLoadedFromServer(true);
+
+    return () => {
+      unsubSettings();
+      unsubProducts();
+      unsubMovements();
+      unsubTransactions();
+      unsubCashiers();
+    };
   }, []);
 
-  // 2. Continuous Polling from Server every 1.5s to stay in real-time sync across all APKs
-  useEffect(() => {
-    if (!hasLoadedFromServer) return;
-    const interval = setInterval(() => {
-      fetch(getApiUrl('/api/data'))
-        .then((res) => res.json())
-        .then((resData) => {
-          if (resData.success && resData.data) {
-            // Skip overwriting local state if we recently made a change ourselves (cooldown 4 seconds)
-            const isCooledDown = Date.now() - lastMutationTimeRef.current > 4000;
-            if (!isCooledDown) {
-              return;
-            }
-
-            const d = resData.data;
-            let updated = false;
-
-            if (d.settings) {
-              if (!d.settings.storeName || d.settings.storeName === 'Toko Berkah Bersama') {
-                d.settings.storeName = 'KOPDES SENDANG DAJAH';
-                d.settings.address = 'Jl. Temor Leke Desa Sendang Dajah Kec. Labang Bangkalan';
-                d.settings.adminWaPhone = '085704800313';
-              }
-              if (JSON.stringify(d.settings) !== JSON.stringify(settings)) {
-                setSettings(d.settings);
-                localStorage.setItem('kasirku_settings', JSON.stringify(d.settings));
-                updated = true;
-              }
-            }
-            if (Array.isArray(d.products) && JSON.stringify(d.products) !== JSON.stringify(products)) {
-              setProducts(d.products);
-              localStorage.setItem('kasirku_products', JSON.stringify(d.products));
-              updated = true;
-            }
-            if (d.stockMovements && JSON.stringify(d.stockMovements) !== JSON.stringify(stockMovements)) {
-              setStockMovements(d.stockMovements);
-              localStorage.setItem('kasirku_movements', JSON.stringify(d.stockMovements));
-              updated = true;
-            }
-            if (d.transactions && JSON.stringify(d.transactions) !== JSON.stringify(transactions)) {
-              setTransactions(d.transactions);
-              localStorage.setItem('kasirku_transactions', JSON.stringify(d.transactions));
-              updated = true;
-            }
-            if (d.cashiers && JSON.stringify(d.cashiers) !== JSON.stringify(cashiers)) {
-              setCashiers(d.cashiers);
-              localStorage.setItem('kasirku_cashiers', JSON.stringify(d.cashiers));
-              updated = true;
-            }
-
-            if (updated) {
-              isUpdatingFromServerRef.current = true;
-            }
-          }
-        })
-        .catch((err) => console.error("Polling error:", err));
-    }, 1500); // Fast 1.5-second polling interval
-
-    return () => clearInterval(interval);
-  }, [hasLoadedFromServer, settings, products, stockMovements, transactions, cashiers]);
-
-  // 3. Central explicit function to save data to server & localStorage
-  const saveToServer = (overrides?: {
+  // 3. Central explicit function to save settings or other states to Firestore
+  const saveToServer = async (overrides?: {
     settings?: StoreSettings;
     products?: Product[];
     stockMovements?: StockMovement[];
     transactions?: SaleTransaction[];
     cashiers?: CashierUser[];
   }) => {
-    // Start 4-second mutation cooldown so polling doesn't overwrite our local changes
-    lastMutationTimeRef.current = Date.now();
-
-    const payload = {
-      settings: overrides?.settings !== undefined ? overrides.settings : settings,
-      products: overrides?.products !== undefined ? overrides.products : products,
-      stockMovements: overrides?.stockMovements !== undefined ? overrides.stockMovements : stockMovements,
-      transactions: overrides?.transactions !== undefined ? overrides.transactions : transactions,
-      cashiers: overrides?.cashiers !== undefined ? overrides.cashiers : cashiers,
-    };
-
-    // Save to localStorage as backup
-    localStorage.setItem('kasirku_settings', JSON.stringify(payload.settings));
-    localStorage.setItem('kasirku_products', JSON.stringify(payload.products));
-    localStorage.setItem('kasirku_movements', JSON.stringify(payload.stockMovements));
-    localStorage.setItem('kasirku_transactions', JSON.stringify(payload.transactions));
-    localStorage.setItem('kasirku_cashiers', JSON.stringify(payload.cashiers));
-
-    fetch(getApiUrl('/api/save'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: payload }),
-    })
-      .then((res) => res.json())
-      .then((resData) => {
-        if (!resData.success) {
-          console.error("Server save failed");
-        }
-      })
-      .catch((err) => console.error("Failed to save to server:", err));
+    try {
+      if (overrides?.settings) {
+        await setDoc(doc(db, 'settings', 'config'), overrides.settings);
+      }
+    } catch (err) {
+      console.error("Firestore saveToServer error:", err);
+    }
   };
 
   // Cashier management
@@ -415,31 +366,33 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isActive: true,
       createdAt: new Date().toISOString(),
     };
-    setCashiers((prev) => {
-      const next = [...prev, newCashier];
-      saveToServer({ cashiers: next });
-      return next;
-    });
+    setDoc(doc(db, 'cashiers', newCashier.id), newCashier).catch((err) =>
+      console.error("Firestore addCashier error:", err)
+    );
     return newCashier;
   };
 
   const updateCashier = (id: string, name: string, pin: string, isActive: boolean) => {
-    setCashiers((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, name: name.trim(), pin: pin.trim(), isActive } : c));
-      saveToServer({ cashiers: next });
-      return next;
-    });
+    const cashier = cashiers.find((c) => c.id === id);
+    if (!cashier) return;
+    const updated: CashierUser = {
+      ...cashier,
+      name: name.trim(),
+      pin: pin.trim(),
+      isActive,
+    };
+    setDoc(doc(db, 'cashiers', id), updated).catch((err) =>
+      console.error("Firestore updateCashier error:", err)
+    );
     if (currentCashier?.id === id) {
-      setCurrentCashier((prev) => (prev ? { ...prev, name: name.trim(), pin: pin.trim(), isActive } : null));
+      setCurrentCashier(updated);
     }
   };
 
   const deleteCashier = (id: string) => {
-    setCashiers((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      saveToServer({ cashiers: next });
-      return next;
-    });
+    deleteDoc(doc(db, 'cashiers', id)).catch((err) =>
+      console.error("Firestore deleteCashier error:", err)
+    );
     if (currentCashier?.id === id) {
       const remaining = cashiers.filter((c) => c.id !== id);
       setCurrentCashier(remaining[0] || null);
@@ -810,12 +763,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, 0);
 
   // Complete Sale & Auto deduct stock & Auto log stock movement
-  const completeTransaction = (
+  const completeTransaction = async (
     paymentMethod: PaymentMethod,
     cashReceived?: number,
     changeDue?: number,
     referenceNo?: string
-  ): SaleTransaction | null => {
+  ): Promise<any> => {
     if (cart.length === 0) return null;
 
     const trxId = `TRX-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(
@@ -876,27 +829,34 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return prod;
     });
 
-    setProducts(updatedProducts);
-    setStockMovements((prev) => {
-      const nextMovements = [...newStockMovements, ...prev];
-      setTransactions((prevTrx) => {
-        const nextTrx = [newTrx, ...prevTrx];
-        saveToServer({
-          products: updatedProducts,
-          stockMovements: nextMovements,
-          transactions: nextTrx,
-        });
-        return nextTrx;
+    try {
+      const batch = writeBatch(db);
+      
+      // Update products stock
+      updatedProducts.forEach((p) => {
+        batch.set(doc(db, 'products', p.id), p);
       });
-      return nextMovements;
-    });
+
+      // Write new stock movements
+      newStockMovements.forEach((m) => {
+        batch.set(doc(db, 'stockMovements', m.id), m);
+      });
+
+      // Write transaction
+      batch.set(doc(db, 'transactions', trxId), newTrx);
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Firestore completeTransaction error:", err);
+    }
+
     setLatestTransaction(newTrx);
     clearCart();
 
     return newTrx;
   };
 
-  const deleteTransaction = (trxId: string) => {
+  const deleteTransaction = async (trxId: string) => {
     // 1. Find transaction to delete
     const targetTrx = transactions.find((t) => t.id === trxId);
     if (!targetTrx) return;
@@ -938,21 +898,27 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return prod;
     });
 
-    // 3. Update states
-    setProducts(updatedProducts);
-    setStockMovements((prev) => {
-      const nextMovements = [...stockReversals, ...prev];
-      setTransactions((prevTrx) => {
-        const nextTrx = prevTrx.filter((t) => t.id !== trxId);
-        saveToServer({
-          products: updatedProducts,
-          stockMovements: nextMovements,
-          transactions: nextTrx,
-        });
-        return nextTrx;
+    // 3. Commit batch to Firestore
+    try {
+      const batch = writeBatch(db);
+
+      // Restore products stock
+      updatedProducts.forEach((p) => {
+        batch.set(doc(db, 'products', p.id), p);
       });
-      return nextMovements;
-    });
+
+      // Write reversals
+      stockReversals.forEach((r) => {
+        batch.set(doc(db, 'stockMovements', r.id), r);
+      });
+
+      // Delete transaction
+      batch.delete(doc(db, 'transactions', trxId));
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Firestore deleteTransaction error:", err);
+    }
 
     if (latestTransaction?.id === trxId) {
       setLatestTransaction(null);
@@ -960,7 +926,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Stock In (Barang Masuk)
-  const recordStockIn = (
+  const recordStockIn = async (
     productId: string,
     qty: number,
     costPrice?: number,
@@ -989,28 +955,24 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       operator: currentUserName,
     };
 
-    const nextProducts = products.map((p) =>
-      p.id === productId
-        ? {
-            ...p,
-            stock: newStock,
-            costPrice: costPrice !== undefined ? costPrice : p.costPrice,
-          }
-        : p
-    );
-    setProducts(nextProducts);
-    setStockMovements((prev) => {
-      const nextMovements = [movement, ...prev];
-      saveToServer({
-        products: nextProducts,
-        stockMovements: nextMovements,
-      });
-      return nextMovements;
-    });
+    const updatedProduct = {
+      ...product,
+      stock: newStock,
+      costPrice: costPrice !== undefined ? costPrice : product.costPrice,
+    };
+
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'products', productId), updatedProduct);
+      batch.set(doc(db, 'stockMovements', movement.id), movement);
+      await batch.commit();
+    } catch (err) {
+      console.error("Firestore recordStockIn error:", err);
+    }
   };
 
   // Stock Out (Barang Keluar non-penjualan)
-  const recordStockOut = (
+  const recordStockOut = async (
     productId: string,
     qty: number,
     reason: StockReason,
@@ -1036,110 +998,117 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       operator: currentUserName,
     };
 
-    const nextProducts = products.map((p) => (p.id === productId ? { ...p, stock: newStock } : p));
-    setProducts(nextProducts);
-    setStockMovements((prev) => {
-      const nextMovements = [movement, ...prev];
-      saveToServer({
-        products: nextProducts,
-        stockMovements: nextMovements,
-      });
-      return nextMovements;
-    });
+    const updatedProduct = {
+      ...product,
+      stock: newStock,
+    };
+
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'products', productId), updatedProduct);
+      batch.set(doc(db, 'stockMovements', movement.id), movement);
+      await batch.commit();
+    } catch (err) {
+      console.error("Firestore recordStockOut error:", err);
+    }
   };
 
   // Product CRUD
-  const addProduct = (newProd: Omit<Product, 'id'>) => {
-    isUpdatingFromServerRef.current = false;
+  const addProduct = async (newProd: Omit<Product, 'id'>) => {
     const id = `prod-${Date.now()}`;
     const product: Product = { ...newProd, id };
-    const nextProducts = [product, ...products];
-    setProducts(nextProducts);
+    
+    try {
+      await setDoc(doc(db, 'products', id), product);
 
-    let nextMovements = stockMovements;
-    // Record initial stock if > 0
-    if (product.stock > 0) {
-      const movement: StockMovement = {
-        id: `MOV-INIT-${Date.now()}`,
-        productId: id,
-        productName: product.name,
-        type: 'masuk',
-        qty: product.stock,
-        previousStock: 0,
-        newStock: product.stock,
-        reason: 'koreksi_stok',
-        notes: 'Stok awal penambahan produk baru',
-        timestamp: new Date().toISOString(),
-        operator: currentUserName,
-      };
-      nextMovements = [movement, ...stockMovements];
-      setStockMovements(nextMovements);
+      if (product.stock > 0) {
+        const movement: StockMovement = {
+          id: `MOV-INIT-${Date.now()}`,
+          productId: id,
+          productName: product.name,
+          type: 'masuk',
+          qty: product.stock,
+          previousStock: 0,
+          newStock: product.stock,
+          reason: 'koreksi_stok',
+          notes: 'Stok awal penambahan produk baru',
+          timestamp: new Date().toISOString(),
+          operator: currentUserName,
+        };
+        await setDoc(doc(db, 'stockMovements', movement.id), movement);
+      }
+    } catch (err) {
+      console.error("Firestore addProduct error:", err);
     }
-
-    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
-    localStorage.setItem('kasirku_movements', JSON.stringify(nextMovements));
-    
-    // Explicitly save to server immediately!
-    saveToServer({
-      products: nextProducts,
-      stockMovements: nextMovements,
-    });
   };
 
-  const updateProduct = (updated: Product) => {
-    isUpdatingFromServerRef.current = false;
-    const nextProducts = products.map((p) => (p.id === updated.id ? updated : p));
-    setProducts(nextProducts);
-    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
-    
-    // Explicitly save to server immediately!
-    saveToServer({
-      products: nextProducts,
-    });
+  const updateProduct = async (updated: Product) => {
+    try {
+      await setDoc(doc(db, 'products', updated.id), updated);
+    } catch (err) {
+      console.error("Firestore updateProduct error:", err);
+    }
   };
 
-  const deleteProduct = (productId: string) => {
-    isUpdatingFromServerRef.current = false;
-    const nextProducts = products.filter((p) => p.id !== productId);
-    setProducts(nextProducts);
-    removeFromCart(productId);
-    localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
-    
-    // Explicitly save to server immediately!
-    saveToServer({
-      products: nextProducts,
-    });
+  const deleteProduct = async (productId: string) => {
+    try {
+      await deleteDoc(doc(db, 'products', productId));
+      removeFromCart(productId);
+    } catch (err) {
+      console.error("Firestore deleteProduct error:", err);
+    }
   };
 
   // Settings
-  const updateSettings = (newSettings: Partial<StoreSettings>) => {
-    setSettings((prev) => {
-      const next = { ...prev, ...newSettings };
-      saveToServer({ settings: next });
-      return next;
-    });
+  const updateSettings = async (newSettings: Partial<StoreSettings>) => {
+    try {
+      const next = { ...settings, ...newSettings };
+      await setDoc(doc(db, 'settings', 'config'), next);
+    } catch (err) {
+      console.error("Firestore updateSettings error:", err);
+    }
   };
 
-  const resetAllData = () => {
-    setSettings(INITIAL_SETTINGS);
-    setProducts(INITIAL_PRODUCTS);
-    setStockMovements(INITIAL_STOCK_MOVEMENTS);
-    setTransactions(INITIAL_TRANSACTIONS);
-    setCashiers(INITIAL_CASHIERS);
-    setCurrentCashier(INITIAL_CASHIERS[0]);
+  const resetAllData = async () => {
+    try {
+      const batch = writeBatch(db);
+      
+      // Delete current products from Firestore
+      products.forEach((p) => {
+        batch.delete(doc(db, 'products', p.id));
+      });
+      // Delete current stock movements
+      stockMovements.forEach((m) => {
+        batch.delete(doc(db, 'stockMovements', m.id));
+      });
+      // Delete current transactions
+      transactions.forEach((t) => {
+        batch.delete(doc(db, 'transactions', t.id));
+      });
+      // Delete current cashiers
+      cashiers.forEach((c) => {
+        batch.delete(doc(db, 'cashiers', c.id));
+      });
+
+      // Write initial settings, products and cashiers
+      batch.set(doc(db, 'settings', 'config'), INITIAL_SETTINGS);
+      INITIAL_PRODUCTS.forEach((p) => {
+        batch.set(doc(db, 'products', p.id), p);
+      });
+      INITIAL_CASHIERS.forEach((c) => {
+        batch.set(doc(db, 'cashiers', c.id), c);
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.error("Firestore resetAllData error:", err);
+    }
+
     setCart([]);
     setCurrentRole('kasir');
     setIsAuthenticated(false);
     localStorage.clear();
     sessionStorage.clear();
-
-    saveToServer({
-      settings: INITIAL_SETTINGS,
-      products: INITIAL_PRODUCTS,
-      stockMovements: INITIAL_STOCK_MOVEMENTS,
-      transactions: INITIAL_TRANSACTIONS,
-      cashiers: INITIAL_CASHIERS,
-    });
   };
 
   return (
