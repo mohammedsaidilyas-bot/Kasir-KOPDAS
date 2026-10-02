@@ -192,6 +192,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync to Storage
   const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
   const isUpdatingFromServerRef = useRef<boolean>(false);
+  const lastMutationTimeRef = useRef<number>(0);
 
   const getApiUrl = (path: string) => {
     // If running in Cloud Run or Vercel web domain directly in browser
@@ -311,6 +312,12 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then((res) => res.json())
         .then((resData) => {
           if (resData.success && resData.data) {
+            // Skip overwriting local state if we recently made a change ourselves (cooldown 4 seconds)
+            const isCooledDown = Date.now() - lastMutationTimeRef.current > 4000;
+            if (!isCooledDown) {
+              return;
+            }
+
             const d = resData.data;
             let updated = false;
 
@@ -367,6 +374,9 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isUpdatingFromServerRef.current = false;
       return;
     }
+
+    // Start 4-second mutation cooldown so polling doesn't overwrite our local changes
+    lastMutationTimeRef.current = Date.now();
 
     // Save to localStorage as local backup
     localStorage.setItem('kasirku_settings', JSON.stringify(settings));
@@ -1027,20 +1037,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
     localStorage.setItem('kasirku_movements', JSON.stringify(nextMovements));
-
-    fetch(getApiUrl('/api/save'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: {
-          settings,
-          products: nextProducts,
-          stockMovements: nextMovements,
-          transactions,
-          cashiers,
-        },
-      }),
-    }).catch((e) => console.error('Direct add save error:', e));
   };
 
   const updateProduct = (updated: Product) => {
@@ -1048,20 +1044,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextProducts = products.map((p) => (p.id === updated.id ? updated : p));
     setProducts(nextProducts);
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
-
-    fetch(getApiUrl('/api/save'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: {
-          settings,
-          products: nextProducts,
-          stockMovements,
-          transactions,
-          cashiers,
-        },
-      }),
-    }).catch((e) => console.error('Direct update save error:', e));
   };
 
   const deleteProduct = (productId: string) => {
@@ -1070,20 +1052,6 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProducts(nextProducts);
     removeFromCart(productId);
     localStorage.setItem('kasirku_products', JSON.stringify(nextProducts));
-
-    fetch(getApiUrl('/api/save'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: {
-          settings,
-          products: nextProducts,
-          stockMovements,
-          transactions,
-          cashiers,
-        },
-      }),
-    }).catch((e) => console.error('Direct delete save error:', e));
   };
 
   // Settings
