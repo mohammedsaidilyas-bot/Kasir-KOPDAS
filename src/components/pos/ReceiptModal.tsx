@@ -75,6 +75,19 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </button>
         </div>
 
+        {/* Reassurance Banner */}
+        <div className="bg-emerald-50 border-b border-emerald-200 px-5 py-2.5 flex items-center gap-2 text-xs text-emerald-800">
+          <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+            ✓
+          </div>
+          <div>
+            <span className="font-bold block text-[11px]">Selesai & Tersimpan Aman!</span>
+            <span className="text-[10px] text-emerald-700 block">
+              Transaksi ini sudah otomatis tersimpan permanen di cloud & Riwayat Struk.
+            </span>
+          </div>
+        </div>
+
         {/* Thermal Receipt Visual Preview (Target for printing) */}
         <div className="p-6 bg-neutral-100 flex justify-center">
           <div
