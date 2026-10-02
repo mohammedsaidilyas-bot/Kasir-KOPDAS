@@ -47,38 +47,73 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
       setPermissionState('granted');
       setIsLoading(false);
 
-      // Highly sensitive config for barcodes (high fps, multiple formats)
       const config = {
-        fps: 24, // 24 frames per second scan rate for ultra-sensitivity
+        fps: 20,
         qrbox: (width: number, height: number) => {
-          // Wider box optimized for reading linear 1D barcodes
-          const boxWidth = Math.min(width * 0.85, 320);
-          const boxHeight = Math.min(height * 0.45, 160);
+          const boxWidth = Math.min(width * 0.85, 300);
+          const boxHeight = Math.min(height * 0.45, 150);
           return { width: boxWidth, height: boxHeight };
         },
-        aspectRatio: 1.777778, // 16:9 viewport
+        aspectRatio: 1.777778,
       };
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        config,
-        (decodedText) => {
-          // Success callback
-          stopCamera();
-          setPermissionState('prompt');
-          onScanSuccess(decodedText);
-          onClose();
-        },
-        () => {
-          // Failure callback - silent, continues scanning
+      const handleScanSuccess = (decodedText: string) => {
+        stopCamera();
+        setPermissionState('prompt');
+        onScanSuccess(decodedText);
+        onClose();
+      };
+
+      // Multi-stage camera selection for maximum device compatibility across all Android & iOS phones
+      let cameraSelectedId: string | null = null;
+
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          // Detect back/rear camera or select last camera in array (standard main rear camera on Android)
+          const backCam = devices.find((d) => {
+            const label = (d.label || '').toLowerCase();
+            return (
+              label.includes('back') ||
+              label.includes('rear') ||
+              label.includes('environment') ||
+              label.includes('belakang') ||
+              label.includes('0')
+            );
+          });
+          cameraSelectedId = backCam ? backCam.id : devices[devices.length - 1].id;
         }
-      );
+      } catch (camErr) {
+        console.warn('Could not enumerate cameras, using facingMode fallback:', camErr);
+      }
+
+      // Stage 1: Attempt exact hardware camera ID
+      if (cameraSelectedId) {
+        try {
+          await scanner.start(cameraSelectedId, config, handleScanSuccess, () => {});
+          return;
+        } catch (e) {
+          console.warn('Failed with selected cameraId, trying facingMode environment:', e);
+        }
+      }
+
+      // Stage 2: Fallback to facingMode environment
+      try {
+        await scanner.start({ facingMode: 'environment' }, config, handleScanSuccess, () => {});
+        return;
+      } catch (e) {
+        console.warn('Failed with facingMode environment, trying facingMode user:', e);
+      }
+
+      // Stage 3: Fallback to any active camera (user facing)
+      await scanner.start({ facingMode: 'user' }, config, handleScanSuccess, () => {});
+
     } catch (err: any) {
       console.error('Fast camera start error:', err);
       setIsLoading(false);
       setPermissionState('denied');
       setErrorMsg(
-        'Kamera gagal dimulai atau izin ditolak. Pastikan izin kamera telah diberikan di pengaturan browser/perangkat Anda.'
+        'Kamera gagal dibuka. Silakan berikan izin kamera pada aplikasi APK Anda di Pengaturan HP > Aplikasi > Izin Kamera.'
       );
     }
   };
@@ -124,10 +159,10 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 text-left">
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Kamera Sensitif & Kilat</span>
+              <span>Kamera Universal & Sensitif</span>
             </div>
             <p className="text-xs text-neutral-600">
-              Aplikasi ini menggunakan scanner bar-code otomatis bersensitivitas tinggi. Deteksi langsung terjadi seketika saat kamera diarahkan ke barcode.
+              Aplikasi ini menggunakan sistem kamera pintar yang mendukung semua tipe HP Android (Samsung, Xiaomi, Oppo, Vivo, Realme, Infinix) & iPhone.
             </p>
             <button
               type="button"
@@ -157,22 +192,21 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </div>
         )}
 
-        {/* Real-time HTML5-QRCode Scanner Viewport */}
+        {/* Universal Real-time HTML5-QRCode Scanner Viewport */}
         <div className={`space-y-3 ${permissionState !== 'granted' ? 'hidden' : 'block'}`}>
           <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 shadow-inner">
-            {/* Target element for html5-qrcode */}
             <div id="html5-qrcode-scanner-view" className="w-full min-h-[260px] overflow-hidden bg-black" />
             
             {isLoading && (
               <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs z-20">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                <span>Membuka kamera sensitif...</span>
+                <span>Mendeteksi kamera HP...</span>
               </div>
             )}
           </div>
 
           <p className="text-xs text-neutral-600 font-medium">
-            ⚡ <strong>Deteksi Instan Aktif</strong>: Arahkan barcode tepat ke tengah kotak pemindai. Kamera akan membaca secara instan & sensitif tanpa menekan tombol apapun!
+            ⚡ <strong>Deteksi Instan Aktif</strong>: Arahkan barcode tepat ke tengah kotak. Kamera akan memindai secara otomatis di semua jenis HP!
           </p>
         </div>
 
