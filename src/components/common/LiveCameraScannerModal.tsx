@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Camera, ShieldCheck } from 'lucide-react';
+import { X, Camera, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 interface LiveCameraScannerModalProps {
@@ -15,98 +15,86 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
   onScanSuccess,
   title = 'Scan Barcode via Kamera',
 }) => {
-  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const elementId = 'html5-qrcode-reader-live-container';
 
-  const requestCameraAndStart = async () => {
-    setIsLoading(true);
-    setErrorMsg('');
-
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
     if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-      } catch (e) {}
+      scannerRef.current.stop().catch(() => {});
       scannerRef.current = null;
     }
+  };
+
+  const startCamera = async () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    stopCamera();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
       });
-      stream.getTracks().forEach((t) => t.stop());
-
-      setPermissionGranted(true);
+      streamRef.current = stream;
+      setPermissionState('granted');
       setIsLoading(false);
 
-      setTimeout(async () => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+
+      setTimeout(() => {
         try {
-          const html5QrCode = new Html5Qrcode(elementId);
+          const html5QrCode = new Html5Qrcode('html5-qrcode-reader-video-box');
           scannerRef.current = html5QrCode;
-
-          await html5QrCode.start(
-            { facingMode: 'environment' },
-            {
-              fps: 15,
-              qrbox: { width: 250, height: 160 },
-            },
-            (decodedText) => {
-              html5QrCode
-                .stop()
-                .catch(() => {})
-                .finally(() => {
-                  scannerRef.current = null;
-                  setPermissionGranted(false);
-                  onScanSuccess(decodedText);
-                  onClose();
-                });
-            },
-            () => {}
-          );
-        } catch (err: any) {
-          console.error('Start error:', err);
-          setErrorMsg('Gagal mengaktifkan pemindai kamera live.');
+          html5QrCode
+            .start(
+              { facingMode: 'environment' },
+              { fps: 10, qrbox: { width: 250, height: 150 } },
+              (decodedText) => {
+                stopCamera();
+                setPermissionState('prompt');
+                onScanSuccess(decodedText);
+                onClose();
+              },
+              () => {}
+            )
+            .catch((err) => {
+              console.warn('Html5Qrcode live start fallback:', err);
+            });
+        } catch (e) {
+          console.warn('Html5Qrcode init error:', e);
         }
-      }, 300);
+      }, 400);
     } catch (err: any) {
-      console.error('Permission error:', err);
+      console.error('Camera access error:', err);
       setIsLoading(false);
-      setPermissionGranted(false);
-      setErrorMsg(
-        'Akses kamera ditolak atau dibatasi. Mohon klik tombol di bawah untuk memberikan izin akses kamera.'
-      );
+      setPermissionState('denied');
+      setErrorMsg('Akses kamera dibatasi atau ditolak oleh browser/iframe. Gunakan tombol foto instan di bawah.');
     }
   };
 
   useEffect(() => {
     if (!isOpen) {
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            scannerRef.current = null;
-          });
-      }
-      setPermissionGranted(false);
+      stopCamera();
+      setPermissionState('prompt');
       setErrorMsg('');
       setIsLoading(false);
       return;
     }
 
-    requestCameraAndStart();
+    startCamera();
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            scannerRef.current = null;
-          });
-      }
+      stopCamera();
     };
   }, [isOpen]);
 
@@ -122,19 +110,9 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </h3>
           <button
             onClick={() => {
-              if (scannerRef.current) {
-                scannerRef.current
-                  .stop()
-                  .catch(() => {})
-                  .finally(() => {
-                    scannerRef.current = null;
-                    setPermissionGranted(false);
-                    onClose();
-                  });
-              } else {
-                setPermissionGranted(false);
-                onClose();
-              }
+              stopCamera();
+              setPermissionState('prompt');
+              onClose();
             }}
             className="text-neutral-400 hover:text-neutral-700 p-1 cursor-pointer"
           >
@@ -142,36 +120,79 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </button>
         </div>
 
-        {/* Permission Request Prompt Banner / Overlay */}
-        {(!permissionGranted || errorMsg) && (
+        {permissionState === 'prompt' && (
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 text-left">
             <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>Izin Akses Kamera Diperlukan</span>
+              <span>Izinkan Akses Kamera</span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-relaxed">
-              {errorMsg || 'Aplikasi membutuhkan izin kamera Anda untuk memindai barcode produk secara otomatis secara real-time.'}
+              Klik tombol di bawah untuk memberikan izin kamera dan mengaktifkan pemindai barcode secara langsung.
             </p>
             <button
               type="button"
-              onClick={requestCameraAndStart}
+              onClick={startCamera}
               disabled={isLoading}
               className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Camera className="w-4 h-4" />
-              <span>{isLoading ? 'Meminta Izin Kamera...' : 'Izinkan & Aktifkan Kamera Sekarang'}</span>
+              <span>{isLoading ? 'Membuka Kamera...' : 'Aktifkan Kamera Sekarang'}</span>
             </button>
           </div>
         )}
 
-        {/* Live Camera View */}
-        <div className={`space-y-3 ${!permissionGranted ? 'hidden' : 'block'}`}>
+        {permissionState === 'denied' && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 text-left">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>Kamera Dibatasi Iframe / Browser</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed">{errorMsg}</p>
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.capture = 'environment';
+                input.onchange = async (e: any) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const qr = new Html5Qrcode('html5-qrcode-file-hidden');
+                    const text = await qr.scanFile(file, true);
+                    onScanSuccess(text);
+                    onClose();
+                  } catch (err) {
+                    alert('Gagal mendeteksi barcode dari foto.');
+                  }
+                };
+                input.click();
+              }}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Camera className="w-4 h-4" />
+              <span>📷 Ambil Foto Barcode (Kamera Langsung)</span>
+            </button>
+          </div>
+        )}
+
+        {/* Video feed container */}
+        <div className={`space-y-3 ${permissionState !== 'granted' ? 'hidden' : 'block'}`}>
           <div className="relative rounded-xl overflow-hidden bg-neutral-900 border-2 border-emerald-500 min-h-[240px] flex items-center justify-center">
-            <div id={elementId} className="w-full" />
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="w-full h-[240px] object-cover"
+            />
+            <div id="html5-qrcode-reader-video-box" className="absolute inset-0 opacity-0 pointer-events-none" />
+
             {isLoading && (
               <div className="absolute inset-0 bg-neutral-900 flex flex-col items-center justify-center gap-2 text-white text-xs">
                 <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                <span>Menyiapkan kamera live...</span>
+                <span>Menyalakan kamera live...</span>
               </div>
             )}
           </div>
@@ -180,11 +201,12 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
           </p>
         </div>
 
-        <div className="pt-1">
+        <div className="pt-1 flex flex-col gap-2">
           <button
             type="button"
             onClick={() => {
               const simulated = `899${Math.floor(100000000 + Math.random() * 900000000)}`;
+              stopCamera();
               onScanSuccess(simulated);
               onClose();
             }}
@@ -193,6 +215,8 @@ export const LiveCameraScannerModal: React.FC<LiveCameraScannerModalProps> = ({
             Atau gunakan Barcode Otomatis (Simulasi)
           </button>
         </div>
+
+        <div id="html5-qrcode-file-hidden" className="hidden" />
       </div>
     </div>
   );
