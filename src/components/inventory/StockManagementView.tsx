@@ -9,6 +9,7 @@ import {
   MinusCircle,
   CheckCircle2,
   Filter,
+  Barcode,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { StockReason } from '../../types';
@@ -22,6 +23,10 @@ export const StockManagementView: React.FC = () => {
   const { products, stockMovements, recordStockIn, recordStockOut } = usePos();
 
   const [activeSubTab, setActiveSubTab] = useState<'masuk' | 'keluar' | 'status' | 'riwayat'>('masuk');
+
+  // Scanner inputs
+  const [scanBarcodeIn, setScanBarcodeIn] = useState('');
+  const [scanBarcodeOut, setScanBarcodeOut] = useState('');
 
   // Form Stock In states
   const [inProductId, setInProductId] = useState<string>(products[0]?.id || '');
@@ -209,6 +214,57 @@ export const StockManagementView: React.FC = () => {
             )}
 
             <form onSubmit={handleStockInSubmit} className="space-y-4">
+              <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
+                <label className="block text-[11px] font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                  <Barcode className="w-3.5 h-3.5 text-neutral-600" />
+                  <span>Scan Barcode / SKU Cepat:</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={scanBarcodeIn}
+                    onChange={(e) => setScanBarcodeIn(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const found = products.find(
+                          (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
+                        );
+                        if (found) {
+                          handleInProductChange(found.id);
+                          setScanBarcodeIn('');
+                          setInSuccessMsg(`Produk "${found.name}" terpilih via scan!`);
+                          setTimeout(() => setInSuccessMsg(''), 3000);
+                        } else {
+                          alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
+                        }
+                      }
+                    }}
+                    placeholder="Scan atau ketik barcode lalu Enter..."
+                    className="flex-1 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-mono focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const found = products.find(
+                        (p) => p.sku.toLowerCase() === scanBarcodeIn.trim().toLowerCase()
+                      );
+                      if (found) {
+                        handleInProductChange(found.id);
+                        setScanBarcodeIn('');
+                        setInSuccessMsg(`Produk "${found.name}" terpilih via scan!`);
+                        setTimeout(() => setInSuccessMsg(''), 3000);
+                      } else {
+                        alert(`Produk dengan barcode "${scanBarcodeIn}" tidak ditemukan.`);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Cari
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 mb-1">
                   Pilih Produk:
@@ -340,6 +396,53 @@ export const StockManagementView: React.FC = () => {
             )}
 
             <form onSubmit={handleStockOutSubmit} className="space-y-4">
+              <div className="bg-neutral-50 p-2.5 rounded-xl border border-neutral-200">
+                <label className="block text-[11px] font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                  <Barcode className="w-3.5 h-3.5 text-neutral-600" />
+                  <span>Scan Barcode / SKU Cepat:</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={scanBarcodeOut}
+                    onChange={(e) => setScanBarcodeOut(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const found = products.find(
+                          (p) => p.sku.toLowerCase() === scanBarcodeOut.trim().toLowerCase()
+                        );
+                        if (found) {
+                          setOutProductId(found.id);
+                          setScanBarcodeOut('');
+                        } else {
+                          alert(`Produk dengan barcode "${scanBarcodeOut}" tidak ditemukan.`);
+                        }
+                      }
+                    }}
+                    placeholder="Scan atau ketik barcode lalu Enter..."
+                    className="flex-1 px-3 py-1.5 bg-white border border-neutral-200 rounded-lg text-xs font-mono focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const found = products.find(
+                        (p) => p.sku.toLowerCase() === scanBarcodeOut.trim().toLowerCase()
+                      );
+                      if (found) {
+                        setOutProductId(found.id);
+                        setScanBarcodeOut('');
+                      } else {
+                        alert(`Produk dengan barcode "${scanBarcodeOut}" tidak ditemukan.`);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Cari
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 mb-1">
                   Pilih Produk:
