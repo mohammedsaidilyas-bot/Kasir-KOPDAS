@@ -15,6 +15,7 @@ import {
   Tag,
   Check,
   Send,
+  Camera,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { Product, PriceType } from '../../types';
@@ -22,6 +23,7 @@ import { formatRupiah, formatNumber } from '../../utils/formatters';
 import { PaymentModal } from './PaymentModal';
 import { ReceiptModal } from './ReceiptModal';
 import { ClosingStoreModal } from './ClosingStoreModal';
+import { LiveCameraScannerModal } from '../common/LiveCameraScannerModal';
 
 export const PosView: React.FC = () => {
   const {
@@ -52,6 +54,7 @@ export const PosView: React.FC = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState('');
 
   // Extract categories
@@ -92,6 +95,24 @@ export const PosView: React.FC = () => {
       }
     } else {
       alert(`Produk dengan barcode/SKU "${barcodeInput}" tidak ditemukan.`);
+    }
+  };
+
+  const handleScanSuccess = (decodedText: string) => {
+    const clean = decodedText.trim().toLowerCase();
+    const found = products.find(
+      (p) => p.sku.toLowerCase() === clean || p.id === clean || p.name.toLowerCase().includes(clean)
+    );
+
+    if (found) {
+      if (found.stock > 0) {
+        addToCart(found);
+      } else {
+        alert(`Stok produk "${found.name}" habis!`);
+      }
+    } else {
+      setBarcodeInput(decodedText);
+      alert(`Produk dengan barcode "${decodedText}" tidak ditemukan di inventaris.`);
     }
   };
 
@@ -216,9 +237,18 @@ export const PosView: React.FC = () => {
               <button
                 type="submit"
                 className="px-2.5 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-medium shrink-0 transition-colors shadow-xs"
-                title="Tekan Enter untuk input barcode"
+                title="Cari SKU"
               >
-                Scan
+                Cari
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition-colors shadow-xs cursor-pointer"
+                title="Buka kamera live untuk scan barcode"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Scan</span>
               </button>
             </form>
           </div>
@@ -682,6 +712,13 @@ export const PosView: React.FC = () => {
       <ClosingStoreModal
         isOpen={isClosingModalOpen}
         onClose={() => setIsClosingModalOpen(false)}
+      />
+
+      {/* Live Camera Scanner Modal */}
+      <LiveCameraScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScanSuccess={handleScanSuccess}
       />
     </div>
   );
