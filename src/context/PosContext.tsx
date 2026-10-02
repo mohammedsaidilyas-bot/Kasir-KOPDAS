@@ -176,6 +176,20 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync to Storage
   const [hasLoadedFromServer, setHasLoadedFromServer] = useState(false);
 
+  const getApiUrl = (path: string) => {
+    // If we are running in an APK (file:// protocol) or some non-cloud environment,
+    // we must target the absolute URL of the deployment server.
+    if (
+      window.location.protocol === 'file:' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      (!window.location.hostname.includes('run.app') && !window.location.hostname.includes('localhost'))
+    ) {
+      return `https://ais-pre-5ifxiuva2vp7wnisdevtp3-459294540144.asia-southeast1.run.app${path}`;
+    }
+    return path;
+  };
+
   useEffect(() => {
     sessionStorage.setItem('kasirku_authenticated', isAuthenticated ? 'true' : 'false');
   }, [isAuthenticated]);
@@ -192,7 +206,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // 1. Initial Load from Server
   useEffect(() => {
-    fetch('/api/data')
+    fetch(getApiUrl('/api/data'))
       .then((res) => res.json())
       .then((resData) => {
         if (resData.success && resData.data) {
@@ -215,7 +229,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!hasLoadedFromServer) return;
     const interval = setInterval(() => {
-      fetch('/api/data')
+      fetch(getApiUrl('/api/data'))
         .then((res) => res.json())
         .then((resData) => {
           if (resData.success && resData.data) {
@@ -255,7 +269,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('kasirku_cashiers', JSON.stringify(cashiers));
 
     // Post to Express backend
-    fetch('/api/save', {
+    fetch(getApiUrl('/api/save'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
