@@ -42,9 +42,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   useEffect(() => {
     if (isOpen && settings) {
       setAdminWaInput(settings.adminWaPhone || '');
-      setProofImageBase64('');
+      setProofImageBase64(transaction?.paymentProofBase64 || '');
     }
-  }, [isOpen, settings]);
+  }, [isOpen, settings, transaction]);
 
   if (!isOpen || !transaction) return null;
 
