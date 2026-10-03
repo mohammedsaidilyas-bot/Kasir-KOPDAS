@@ -10,6 +10,10 @@ import {
   Layers,
   ChevronRight,
   Trash2,
+  Camera,
+  Image as ImageIcon,
+  X,
+  Eye,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { SaleTransaction, PaymentMethod, PriceType } from '../../types';
@@ -28,6 +32,7 @@ export const TransactionHistoryView: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('semua');
   const [selectedTrx, setSelectedTrx] = useState<SaleTransaction | null>(null);
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [activeProofUrl, setActiveProofUrl] = useState<string>('');
 
   // Filter transactions
   const filtered = transactions.filter((trx) => {
@@ -214,6 +219,21 @@ export const TransactionHistoryView: React.FC = () => {
                     {formatRupiah(trx.grandTotal)}
                   </td>
                   <td className="py-3.5 px-4 text-center space-x-1.5 whitespace-nowrap">
+                    {trx.paymentProofBase64 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveProofUrl(trx.paymentProofBase64 || '');
+                        }}
+                        className="px-2 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Lihat Gambar Bukti Pembayaran QRIS/Transfer"
+                      >
+                        <Camera className="w-3 h-3" />
+                        <span>Bukti</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => {
@@ -268,6 +288,43 @@ export const TransactionHistoryView: React.FC = () => {
         isOpen={isReceiptOpen}
         onClose={() => setIsReceiptOpen(false)}
       />
+
+      {/* Lightbox Modal for Payment Proof */}
+      {activeProofUrl && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
+          <div className="relative bg-white rounded-2xl max-w-lg w-full overflow-hidden p-4 border border-neutral-300 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-100 mb-4">
+              <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-600" />
+                <span>Gambar Bukti Pembayaran QRIS / Transfer</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveProofUrl('')}
+                className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex items-center justify-center bg-neutral-900 rounded-xl p-2 h-96 overflow-hidden">
+              <img
+                src={activeProofUrl}
+                alt="Gambar Bukti Pembayaran"
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+            <div className="pt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveProofUrl('')}
+                className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-semibold text-xs rounded-xl transition-colors"
+              >
+                Tutup Gambar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

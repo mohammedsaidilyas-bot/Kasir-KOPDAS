@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Printer,
   Share2,
@@ -7,6 +7,9 @@ import {
   PlusCircle,
   X,
   FileText,
+  Camera,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { usePos } from '../../context/PosContext';
 import { SaleTransaction } from '../../types';
@@ -27,8 +30,21 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { settings } = usePos();
+  const { settings, updateTransaction } = usePos();
   const [copied, setCopied] = useState(false);
+
+  // Send Proof WhatsApp States
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
+  const [proofImageBase64, setProofImageBase64] = useState('');
+  const [adminWaInput, setAdminWaInput] = useState('');
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && settings) {
+      setAdminWaInput(settings.adminWaPhone || '');
+      setProofImageBase64('');
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen || !transaction) return null;
 
@@ -245,6 +261,16 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
         {/* Action Buttons Toolbar */}
         <div className="p-4 bg-white border-t border-neutral-200 space-y-2">
+          {/* Kirim Bukti Pembayaran ke WhatsApp Admin Button */}
+          <button
+            type="button"
+            onClick={() => setIsProofModalOpen(true)}
+            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+          >
+            <Camera className="w-4 h-4 text-emerald-300" />
+            <span>Kirim Bukti Pembayaran ke WhatsApp Admin</span>
+          </button>
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -258,10 +284,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             <button
               type="button"
               onClick={handleWhatsApp}
-              className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
+              className="py-2.5 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs transition-colors"
             >
-              <Share2 className="w-4 h-4" />
-              <span>Kirim WhatsApp</span>
+              <Share2 className="w-4 h-4 text-neutral-600" />
+              <span>Kirim WhatsApp Struk</span>
             </button>
           </div>
 
@@ -297,6 +323,182 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Proof Confirmation Modal (Popup) */}
+      {isProofModalOpen && (
+        <div className="fixed inset-0 z-55 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-neutral-200 w-full max-w-md my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/70">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-neutral-900">
+                  Kirim Bukti Bayar ke WhatsApp Admin
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsProofModalOpen(false)}
+                className="p-1 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!adminWaInput.trim()) {
+                  alert("Masukkan nomor WhatsApp admin terlebih dahulu.");
+                  return;
+                }
+                setIsUploadingProof(true);
+                try {
+                  if (proofImageBase64) {
+                    await updateTransaction(transaction.id, {
+                      paymentProofBase64: proofImageBase64,
+                    });
+                    transaction.paymentProofBase64 = proofImageBase64;
+                  }
+                  const cleanPhone = adminWaInput.replace(/\D/g, "");
+                  const formattedPhone = cleanPhone.startsWith("0") ? "62" + cleanPhone.slice(1) : cleanPhone;
+                  const text = `*KONFIRMASI BUKTI PEMBAYARAN QRIS/TRANSFER* 🧾✨\n\nHalo Admin, berikut adalah pemberitahuan pembayaran dari Kasir:\n\n- *No. Struk*: ${transaction.id}\n- *Waktu*: ${formatDateTime(transaction.timestamp)}\n- *Kasir*: ${transaction.cashierName}\n- *Metode Bayar*: ${paymentLabels[transaction.paymentMethod] || transaction.paymentMethod.toUpperCase()}\n- *Total Tagihan*: *${formatRupiah(transaction.grandTotal)}*\n- *Status*: LUNAS / SUKSES\n\n${proofImageBase64 ? "📸 _(Gambar bukti pembayaran sudah diunggah ke sistem kasir cloud)_" : ""}\n\nSilakan periksa mutasi rekening Anda. Terima kasih!`;
+                  const encodedText = encodeURIComponent(text);
+                  window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedText}`, '_blank');
+                  setIsProofModalOpen(false);
+                } catch (err) {
+                  console.error(err);
+                  alert("Gagal memproses bukti pembayaran.");
+                } finally {
+                  setIsUploadingProof(false);
+                }
+              }}
+              className="p-6 space-y-4"
+            >
+              {/* WhatsApp Input */}
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                  Nomor WhatsApp Admin Tujuan:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={adminWaInput}
+                  onChange={(e) => setAdminWaInput(e.target.value)}
+                  placeholder="Contoh: 081234567890"
+                  className="w-full px-3 py-2 border border-neutral-300 rounded-xl text-xs font-mono font-bold tracking-wide focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                />
+                <span className="text-[10px] text-neutral-400 mt-1 block">
+                  Nomor pre-filled dari pengaturan toko, Anda bisa merubahnya jika diperlukan.
+                </span>
+              </div>
+
+              {/* File Uploader / Image capture */}
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1.5">
+                  Lampirkan Gambar Bukti Pembayaran / Screenshot:
+                </label>
+
+                <div className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-neutral-200 hover:border-neutral-400 bg-neutral-50 rounded-xl transition-all text-center space-y-2">
+                  {proofImageBase64 ? (
+                    <div className="relative w-full max-h-48 rounded-lg overflow-hidden border bg-white flex items-center justify-center p-1">
+                      <img
+                        src={proofImageBase64}
+                        alt="Preview Bukti Bayar"
+                        className="max-w-full max-h-44 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProofImageBase64('')}
+                        className="absolute top-1.5 right-1.5 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-xs cursor-pointer"
+                        title="Hapus foto"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 py-2">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-neutral-700 block">
+                          Pilih / Ambil Foto Bukti Bayar
+                        </span>
+                        <span className="text-[10px] text-neutral-400 block mt-0.5">
+                          Format JPG/PNG. Kamera didukung otomatis.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <label className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors inline-block shadow-2xs">
+                    <span>{proofImageBase64 ? 'Ganti Foto Bukti' : 'Pilih File / Kamera'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const img = new Image();
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const maxDimension = 600; // light quality image for cloud database
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height) {
+                              if (width > maxDimension) {
+                                height *= maxDimension / width;
+                                width = maxDimension;
+                              }
+                            } else {
+                              if (height > maxDimension) {
+                                width *= maxDimension / height;
+                                height = maxDimension;
+                              }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, width, height);
+
+                            const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                            setProofImageBase64(base64);
+                          };
+                          img.src = event.target?.result as string;
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Form Action Button */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isUploadingProof}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                >
+                  {isUploadingProof ? (
+                    <span>Sedang Menyimpan...</span>
+                  ) : (
+                    <>
+                      <Share2 className="w-4 h-4 text-emerald-200" />
+                      <span>Kirim via WhatsApp & Simpan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

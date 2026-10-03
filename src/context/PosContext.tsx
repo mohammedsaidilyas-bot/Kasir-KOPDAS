@@ -95,6 +95,7 @@ interface PosContextType {
     referenceNo?: string
   ) => Promise<any>;
   deleteTransaction: (id: string) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<SaleTransaction>) => Promise<void>;
   latestTransaction: SaleTransaction | null;
   setLatestTransaction: (trx: SaleTransaction | null) => void;
 
@@ -918,6 +919,14 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateTransaction = async (trxId: string, updates: Partial<SaleTransaction>) => {
+    try {
+      await setDoc(doc(db, 'transactions', trxId), updates, { merge: true });
+    } catch (err) {
+      console.error("Firestore updateTransaction error:", err);
+    }
+  };
+
   // Stock In (Barang Masuk)
   const recordStockIn = async (
     productId: string,
@@ -1155,6 +1164,7 @@ export const PosProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         transactions,
         completeTransaction,
         deleteTransaction,
+        updateTransaction,
         latestTransaction,
         setLatestTransaction,
         stockMovements,

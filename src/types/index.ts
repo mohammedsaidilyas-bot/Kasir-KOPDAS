@@ -51,6 +51,7 @@ export interface SaleTransaction {
   changeDue?: number;
   referenceNo?: string;
   status: 'selesai' | 'dibatalkan';
+  paymentProofBase64?: string; // Base64 string of receipt/payment proof
 }
 
 export type StockReason = 
@@ -97,4 +98,5 @@ export interface StoreSettings {
   pinKasir: string;
   pinPengelola: string;
   pinAdmin: string;
+  qrisImageBase64?: string; // Custom QRIS image Base64 string
 }

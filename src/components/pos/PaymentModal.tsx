@@ -284,41 +284,51 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
               <div className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200 inline-block mx-auto">
                 {/* Visual QRIS Stamp */}
                 <div className="bg-white p-3 rounded-xl shadow-xs border border-neutral-200 inline-block">
-                  <div className="text-[10px] font-bold tracking-widest text-neutral-800 mb-1">
+                  <div className="text-[10px] font-bold tracking-widest text-neutral-800 mb-2 border-b pb-1">
                     QRIS · STANDAR PEMBAYARAN NASIONAL
                   </div>
-                  {/* Clean SVG QR code representation */}
-                  <svg
-                    className="w-44 h-44 mx-auto text-neutral-900"
-                    viewBox="0 0 100 100"
-                    fill="currentColor"
-                  >
-                    {/* Corner anchors */}
-                    <rect x="5" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
-                    <rect x="11" y="11" width="13" height="13" />
-                    <rect x="70" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
-                    <rect x="76" y="11" width="13" height="13" />
-                    <rect x="5" y="70" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
-                    <rect x="11" y="76" width="13" height="13" />
-                    {/* Matrix pattern dots */}
-                    <rect x="36" y="8" width="6" height="6" />
-                    <rect x="48" y="8" width="6" height="6" />
-                    <rect x="36" y="20" width="6" height="6" />
-                    <rect x="54" y="20" width="8" height="6" />
-                    <rect x="8" y="42" width="6" height="6" />
-                    <rect x="20" y="42" width="6" height="6" />
-                    <rect x="8" y="54" width="6" height="6" />
-                    <rect x="36" y="36" width="28" height="28" fill="#10B981" />
-                    <rect x="42" y="42" width="16" height="16" fill="white" />
-                    <rect x="70" y="40" width="8" height="6" />
-                    <rect x="84" y="46" width="6" height="8" />
-                    <rect x="72" y="60" width="6" height="6" />
-                    <rect x="86" y="60" width="6" height="6" />
-                    <rect x="40" y="72" width="8" height="8" />
-                    <rect x="54" y="80" width="8" height="6" />
-                    <rect x="74" y="78" width="14" height="10" />
-                  </svg>
-                  <div className="mt-1 font-semibold text-xs text-neutral-800">
+                  {settings.qrisImageBase64 ? (
+                    <div className="w-52 h-52 mx-auto flex items-center justify-center overflow-hidden border border-neutral-100 rounded-lg p-1 bg-white">
+                      <img
+                        src={settings.qrisImageBase64}
+                        alt="QRIS Code Toko"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    /* Clean SVG QR code representation */
+                    <svg
+                      className="w-44 h-44 mx-auto text-neutral-900"
+                      viewBox="0 0 100 100"
+                      fill="currentColor"
+                    >
+                      {/* Corner anchors */}
+                      <rect x="5" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
+                      <rect x="11" y="11" width="13" height="13" />
+                      <rect x="70" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
+                      <rect x="76" y="11" width="13" height="13" />
+                      <rect x="5" y="70" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="4" />
+                      <rect x="11" y="76" width="13" height="13" />
+                      {/* Matrix pattern dots */}
+                      <rect x="36" y="8" width="6" height="6" />
+                      <rect x="48" y="8" width="6" height="6" />
+                      <rect x="36" y="20" width="6" height="6" />
+                      <rect x="54" y="20" width="8" height="6" />
+                      <rect x="8" y="42" width="6" height="6" />
+                      <rect x="20" y="42" width="6" height="6" />
+                      <rect x="8" y="54" width="6" height="6" />
+                      <rect x="36" y="36" width="28" height="28" fill="#10B981" />
+                      <rect x="42" y="42" width="16" height="16" fill="white" />
+                      <rect x="70" y="40" width="8" height="6" />
+                      <rect x="84" y="46" width="6" height="8" />
+                      <rect x="72" y="60" width="6" height="6" />
+                      <rect x="86" y="60" width="6" height="6" />
+                      <rect x="40" y="72" width="8" height="8" />
+                      <rect x="54" y="80" width="8" height="6" />
+                      <rect x="74" y="78" width="14" height="10" />
+                    </svg>
+                  )}
+                  <div className="mt-2 font-semibold text-xs text-neutral-800">
                     {settings.storeName}
                   </div>
                   <div className="text-[11px] font-mono text-emerald-600 font-bold">

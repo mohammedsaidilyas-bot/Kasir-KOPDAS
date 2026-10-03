@@ -40,6 +40,7 @@ export const SettingsView: React.FC = () => {
     pinKasir: settings.pinKasir,
     pinPengelola: settings.pinPengelola,
     pinAdmin: settings.pinAdmin,
+    qrisImageBase64: settings.qrisImageBase64 || '',
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -267,6 +268,108 @@ export const SettingsView: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, receiptFooter: e.target.value })}
                 className="w-full px-3 py-2 border border-neutral-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-neutral-900"
               />
+            </div>
+
+            {/* QRIS Code Upload Section */}
+            <div className="pt-4 border-t border-neutral-100">
+              <label className="block text-xs font-bold text-neutral-900 mb-1.5 flex items-center gap-1.5">
+                <span>Gambar QRIS Toko Anda (Opsional):</span>
+                <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
+                  Muncul otomatis saat pembayaran QRIS
+                </span>
+              </label>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-4 bg-neutral-50 p-4 rounded-xl border border-dashed border-neutral-200">
+                {formData.qrisImageBase64 ? (
+                  <div className="relative w-32 h-32 shrink-0 border border-neutral-200 rounded-lg bg-white overflow-hidden p-1 flex items-center justify-center">
+                    <img
+                      src={formData.qrisImageBase64}
+                      alt="Gambar QRIS Toko"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, qrisImageBase64: '' })}
+                      className="absolute -top-1 -right-1 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-xs cursor-pointer"
+                      title="Hapus gambar QRIS"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 shrink-0 border border-neutral-200 rounded-lg bg-neutral-100 flex flex-col items-center justify-center text-center p-3 text-neutral-400">
+                    <svg className="w-8 h-8 mb-1 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1.001 1.001 0 00.707-.293l1-1A1.001 1.001 0 019.414 6h5.172a1.001 1.001 0 01.707.293l1 1A1.001 1.001 0 0017 8h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z" />
+                    </svg>
+                    <span className="text-[10px] font-semibold text-neutral-500">Belum Ada Gambar QRIS</span>
+                  </div>
+                )}
+                
+                <div className="space-y-1.5 text-center sm:text-left flex-1">
+                  <div className="text-xs font-bold text-neutral-700">Unggah Gambar QRIS Toko</div>
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Pilih file gambar QRIS resmi toko Anda (JPG/PNG). Gambar akan ditampilkan kepada pelanggan/kasir saat memilih metode bayar QRIS.
+                  </p>
+                  <div className="flex gap-2 justify-center sm:justify-start">
+                    <label className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors inline-block shadow-2xs">
+                      <span>Pilih Gambar QRIS</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          // Canvas compression
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              const maxDimension = 500; // max width/height 500px for super light Firestore save
+                              let width = img.width;
+                              let height = img.height;
+                              
+                              if (width > height) {
+                                if (width > maxDimension) {
+                                  height *= maxDimension / width;
+                                  width = maxDimension;
+                                }
+                              } else {
+                                if (height > maxDimension) {
+                                  width *= maxDimension / height;
+                                  height = maxDimension;
+                                }
+                              }
+                              
+                              canvas.width = width;
+                              canvas.height = height;
+                              const ctx = canvas.getContext('2d');
+                              ctx?.drawImage(img, 0, 0, width, height);
+                              
+                              // Compress to jpeg quality 0.7
+                              const base64 = canvas.toDataURL('image/jpeg', 0.7);
+                              setFormData(prev => ({ ...prev, qrisImageBase64: base64 }));
+                            };
+                            img.src = event.target?.result as string;
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {formData.qrisImageBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, qrisImageBase64: '' })}
+                        className="px-2.5 py-1.5 border border-rose-200 text-rose-700 hover:bg-rose-50 text-[11px] font-semibold rounded-lg transition-colors"
+                      >
+                        Hapus Gambar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
