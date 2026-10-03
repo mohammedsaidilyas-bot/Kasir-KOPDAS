@@ -63,23 +63,50 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     }
   }, [isProofModalOpen, cameraStream]);
 
+  // Robust HTML5 Video Stream Attachment
+  useEffect(() => {
+    let active = true;
+    if (isStreaming && cameraStream && videoRef.current) {
+      const video = videoRef.current;
+      video.srcObject = cameraStream;
+      
+      const playVideo = async () => {
+        try {
+          if (active) {
+            await video.play();
+          }
+        } catch (err) {
+          console.warn("Autoplay was prevented or video failed to play:", err);
+        }
+      };
+      
+      playVideo();
+    }
+    return () => {
+      active = false;
+    };
+  }, [isStreaming, cameraStream]);
+
   const startCamera = async () => {
     try {
       setIsStreaming(true);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // use rear camera
-        audio: false,
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }, // Try rear camera first
+          audio: false,
+        });
+      } catch (err) {
+        console.warn("Could not start environment camera, trying fallback...", err);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true, // Try any available camera as fallback
+          audio: false,
+        });
+      }
       setCameraStream(stream);
-      // Wait for React to render video element, then attach stream
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      }, 100);
     } catch (err) {
       console.error("Camera access error:", err);
-      alert("Gagal mengakses kamera. Pastikan Anda mengizinkan akses kamera di aplikasi/browser.");
+      alert("Gagal mengakses kamera. Pastikan Anda memberikan izin akses kamera di pengaturan browser/HP Anda.");
       setIsStreaming(false);
     }
   };
@@ -467,6 +494,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                         ref={videoRef}
                         autoPlay
                         playsInline
+                        muted
                         className="w-full h-full object-cover"
                       />
                     </div>
