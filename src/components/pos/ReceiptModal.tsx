@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Printer,
   Share2,
@@ -39,12 +39,74 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   const [adminWaInput, setAdminWaInput] = useState('');
   const [isUploadingProof, setIsUploadingProof] = useState(false);
 
+  // HTML5 Live Camera stream states and refs
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (isOpen && settings) {
       setAdminWaInput(settings.adminWaPhone || '');
       setProofImageBase64(transaction?.paymentProofBase64 || '');
     }
   }, [isOpen, settings, transaction]);
+
+  // Turn off the camera when the proof modal is closed
+  useEffect(() => {
+    if (!isProofModalOpen) {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+      }
+      setIsStreaming(false);
+    }
+  }, [isProofModalOpen, cameraStream]);
+
+  const startCamera = async () => {
+    try {
+      setIsStreaming(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }, // use rear camera
+        audio: false,
+      });
+      setCameraStream(stream);
+      // Wait for React to render video element, then attach stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera access error:", err);
+      alert("Gagal mengakses kamera. Pastikan Anda mengizinkan akses kamera di aplikasi/browser.");
+      setIsStreaming(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsStreaming(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const video = videoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 600;
+      canvas.height = video.videoHeight || 800;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        setProofImageBase64(base64);
+        stopCamera();
+      }
+    }
+  };
 
   if (!isOpen || !transaction) return null;
 
@@ -397,42 +459,98 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                   Lampirkan Gambar Bukti Pembayaran / Screenshot:
                 </label>
 
-                <div className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-neutral-200 hover:border-neutral-400 bg-neutral-50 rounded-xl transition-all text-center space-y-2">
-                  {proofImageBase64 ? (
-                    <div className="relative w-full max-h-48 rounded-lg overflow-hidden border bg-white flex items-center justify-center p-1">
-                      <img
-                        src={proofImageBase64}
-                        alt="Preview Bukti Bayar"
-                        className="max-w-full max-h-44 object-contain"
+                {isStreaming ? (
+                  /* HTML5 Live Video Stream Capture UI */
+                  <div className="flex flex-col items-center justify-center p-3 bg-neutral-900 rounded-xl space-y-3">
+                    <div className="relative w-full h-64 rounded-lg overflow-hidden border border-neutral-700 bg-black flex items-center justify-center">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover"
                       />
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
                       <button
                         type="button"
-                        onClick={() => setProofImageBase64('')}
-                        className="absolute top-1.5 right-1.5 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-xs cursor-pointer"
-                        title="Hapus foto"
+                        onClick={capturePhoto}
+                        className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Ambil Foto</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="flex-1 py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
+                        <span>Batal Kamera</span>
                       </button>
                     </div>
-                  ) : (
-                    <div className="space-y-2 py-2">
-                      <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                        <Camera className="w-5 h-5" />
+                  </div>
+                ) : (
+                  /* Standard Preview or Upload Action UI */
+                  <div className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-neutral-200 hover:border-neutral-400 bg-neutral-50 rounded-xl transition-all text-center space-y-3">
+                    {proofImageBase64 ? (
+                      <div className="relative w-full max-h-48 rounded-lg overflow-hidden border bg-white flex items-center justify-center p-1">
+                        <img
+                          src={proofImageBase64}
+                          alt="Preview Bukti Bayar"
+                          className="max-w-full max-h-44 object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setProofImageBase64('')}
+                          className="absolute top-1.5 right-1.5 p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-xs cursor-pointer"
+                          title="Hapus foto"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <div>
-                        <span className="text-xs font-bold text-neutral-700 block">
-                          Ambil Foto Kamera / Pilih File Bukti
-                        </span>
-                        <span className="text-[10px] text-neutral-500 block mt-0.5">
-                          Sistem akan menampilkan pilihan Kamera untuk memfoto langsung, atau Galeri untuk memilih file screenshot.
-                        </span>
+                    ) : (
+                      <div className="space-y-2 py-1">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
+                          <Camera className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-neutral-700 block">
+                            Ambil Foto Kamera / Pilih File Bukti
+                          </span>
+                          <span className="text-[10px] text-neutral-500 block mt-0.5 max-w-[280px] mx-auto leading-relaxed">
+                            Ambil foto langsung dengan Kamera HP, atau pilih file gambar screenshot dari galeri.
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <label className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors inline-block shadow-2xs">
-                    <span>{proofImageBase64 ? 'Foto Ulang / Ganti File' : 'Buka Kamera / Pilih File'}</span>
+                    <div className="flex flex-col sm:flex-row items-center gap-2 pt-1 w-full justify-center">
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Buka Kamera Langsung</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = ''; // Guaranteed change event trigger
+                            fileInputRef.current.click();
+                          }
+                        }}
+                        className="w-full sm:w-auto px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Unggah dari Galeri</span>
+                      </button>
+                    </div>
+
                     <input
+                      ref={fileInputRef}
                       type="file"
                       accept="image/*"
                       className="hidden"
@@ -474,8 +592,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                         reader.readAsDataURL(file);
                       }}
                     />
-                  </label>
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Form Action Button */}
