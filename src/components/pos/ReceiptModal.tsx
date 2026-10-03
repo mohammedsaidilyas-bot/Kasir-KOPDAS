@@ -566,7 +566,6 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                         type="button"
                         onClick={() => {
                           if (fileInputRef.current) {
-                            fileInputRef.current.value = ''; // Guaranteed change event trigger
                             fileInputRef.current.click();
                           }
                         }}
@@ -585,6 +584,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
+
+                        // Clear the file input value so that any subsequent clicks are guaranteed to trigger onChange cleanly
+                        e.target.value = '';
 
                         const reader = new FileReader();
                         reader.onload = (event) => {
