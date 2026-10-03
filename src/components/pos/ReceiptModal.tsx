@@ -421,21 +421,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                       </div>
                       <div>
                         <span className="text-xs font-bold text-neutral-700 block">
-                          Ambil Foto Bukti Bayar (Kamera)
+                          Ambil Foto Kamera / Pilih File Bukti
                         </span>
                         <span className="text-[10px] text-neutral-500 block mt-0.5">
-                          Kamera HP Anda akan langsung terbuka otomatis untuk memfoto struk/bukti bayar.
+                          Sistem akan menampilkan pilihan Kamera untuk memfoto langsung, atau Galeri untuk memilih file screenshot.
                         </span>
                       </div>
                     </div>
                   )}
 
                   <label className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors inline-block shadow-2xs">
-                    <span>{proofImageBase64 ? 'Foto Ulang Bukti' : 'Buka Kamera & Foto'}</span>
+                    <span>{proofImageBase64 ? 'Foto Ulang / Ganti File' : 'Buka Kamera / Pilih File'}</span>
                     <input
                       type="file"
                       accept="image/*"
-                      capture="environment"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
